@@ -330,7 +330,8 @@ def start_task(f: dict) -> dict:
             "area": clean(f.get("area"), 60), "service": clean(f.get("service"), 60),
             "details": clean(f.get("details")), "when": clean(f.get("when"), 60), "budget": rupees(f.get("budget")),
             "category": categorize(f.get("service"), f.get("details"), said=f.get("category") or ""),
-            "language": f.get("language") if f.get("language") in LANGS else "en"}
+            "language": f.get("language") if f.get("language") in LANGS else "en",
+            "intake_call_id": clean(f.get("call_id"), 80)}
     missing = [k for k in ("service", "budget") if not task[k]] + ([] if len(phone) == 10 else ["phone"])
     if missing:
         return {"missing": missing}
@@ -347,6 +348,7 @@ def start_task(f: dict) -> dict:
     publish("task", task_id=task_id, name=task["name"], area=task["area"], service=task["service"],
             details=task["details"], when=task["when"], budget=task["budget"],
             category=task["category"], category_label=CATEGORIES[task["category"]][0],
+            intake_call_id=task["intake_call_id"],
             vendors=[v["name"] for v in TASKS[task_id]["pending"]])
     later(2, ring_next, task_id)
     return {"task_id": task_id}
@@ -680,7 +682,7 @@ def handle(row: dict) -> bool:
             change_request(phone, intent, e.get("new_time"))
             return True
         # A website caller gave their name in the form, so the call never asked for it.
-        res = start_task({"language": placed.get("language", "en"),
+        res = start_task({"call_id": call_id, "language": placed.get("language", "en"),
                           "name": e.get("customer_name") or placed.get("name"), "phone": phone, "address": e.get("address"),
                           "area": e.get("area"), "service": e.get("service"), "details": e.get("details"),
                           "when": e.get("when"), "budget": e.get("budget"), "category": e.get("category")})
@@ -989,12 +991,12 @@ def remove_vendor(name: str, key: str | None = Query(None)):
 
 
 @app.get("/events")
-async def events(key: str | None = Query(None), after: int = 0):
-    """SSE feed of everything Sorted does, for the dashboard."""
+async def events(key: str | None = Query(None), after: int = 0, full: bool = False):
+    """SSE feed of everything Sorted does. full=1 replays all of it, for rebuilding a request's journey."""
     authorised(key)
 
     async def stream():
-        sent = max(after, len(EVENTS) - 80)
+        sent = 0 if full else max(after, len(EVENTS) - 80)
         while True:
             while sent < len(EVENTS):
                 yield f"data: {json.dumps(EVENTS[sent], ensure_ascii=False)}\n\n"

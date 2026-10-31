@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Instrument_Serif, Kalam, Manrope } from "next/font/google";
-import { CheckCircle, SpinnerGap, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircleIcon as CheckCircle, SpinnerGapIcon as SpinnerGap, WarningCircleIcon as WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { Toaster } from "sonner";
 import "./globals.css";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { animate, stagger } from "animejs";
-import { Lightning, PhoneCall, Snowflake, Wrench } from "@phosphor-icons/react";
+import { LightningIcon as Lightning, PhoneCallIcon as PhoneCall, SnowflakeIcon as Snowflake, WrenchIcon as Wrench } from "@phosphor-icons/react";
 import Image from "next/image";
 import { useEffect, useRef } from "react";
 

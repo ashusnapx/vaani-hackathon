@@ -1,6 +1,6 @@
 "use client";
 
-import { DeviceMobile, PhoneCall, Translate, User } from "@phosphor-icons/react";
+import { DeviceMobileIcon as DeviceMobile, PhoneCallIcon as PhoneCall, TranslateIcon as Translate, UserIcon as User } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 

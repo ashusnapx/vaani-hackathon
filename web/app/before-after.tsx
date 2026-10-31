@@ -1,4 +1,4 @@
-import { EyeSlash, FileAudio, HandCoins, PhoneOutgoing, Repeat } from "@phosphor-icons/react/dist/ssr";
+import { EyeSlashIcon as EyeSlash, FileAudioIcon as FileAudio, HandCoinsIcon as HandCoins, PhoneOutgoingIcon as PhoneOutgoing, RepeatIcon as Repeat } from "@phosphor-icons/react/dist/ssr";
 import { AfterSketch, BeforeSketch } from "./sketch-art";
 
 // Product facts for one job with three mechanics, not survey statistics.

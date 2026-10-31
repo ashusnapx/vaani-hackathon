@@ -1,5 +1,5 @@
 import { ReactLenis } from "lenis/react";
-import { Gauge, HandCoins, Phone, PhoneIncoming, PhoneOutgoing, UsersThree } from "@phosphor-icons/react/dist/ssr";
+import { GaugeIcon as Gauge, HandCoinsIcon as HandCoins, PhoneIcon as Phone, PhoneIncomingIcon as PhoneIncoming, PhoneOutgoingIcon as PhoneOutgoing, UsersThreeIcon as UsersThree } from "@phosphor-icons/react/dist/ssr";
 import Image from "next/image";
 import Link from "next/link";
 import BeforeAfter from "./before-after";

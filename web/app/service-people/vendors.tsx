@@ -1,6 +1,6 @@
 "use client";
 
-import { PencilSimple, Trash, UserPlus, X } from "@phosphor-icons/react";
+import { PencilSimpleIcon as PencilSimple, TrashIcon as Trash, UserPlusIcon as UserPlus, XIcon as X } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
 
 type Vendor = { name: string; phone_tail: string; services: string[]; verified?: boolean; rating?: number | null; ratings?: number };

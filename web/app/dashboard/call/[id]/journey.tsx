@@ -1,0 +1,247 @@
+"use client";
+
+import { ArrowRightIcon as ArrowRight, CalendarXIcon as CalendarX, ChatCircleDotsIcon as ChatCircleDots, CheckCircleIcon as CheckCircle, HandshakeIcon as Handshake, LockIcon as Lock, PhoneCallIcon as PhoneCall, PhoneIncomingIcon as PhoneIncoming, PhoneOutgoingIcon as PhoneOutgoing, ScalesIcon as Scales, StarIcon as Star } from "@phosphor-icons/react";
+import Link from "next/link";
+import { type ComponentType, useEffect, useMemo, useState } from "react";
+import { type Ev, type Row, Detail, dur, inr, s, when } from "../../call-detail";
+
+type Step = {
+  key: string;
+  Icon: ComponentType<{ className?: string; weight?: "regular" | "fill" | "duotone" }>;
+  title: string;
+  caption?: string;
+  call?: string;
+  state: "done" | "live" | "waiting" | "skipped";
+};
+
+const priced = (q?: Record<string, unknown> | null) =>
+  !q || !q.price ? "—" : `${inr(q.price)}${q.price_max ? `–${Number(q.price_max).toLocaleString("en-IN")}` : ""}${q.open ? "+" : ""}`;
+
+/** Every step a request takes, rebuilt from Sorted's event log. */
+function journey(id: string, events: Ev[]) {
+  const tagged = events.find((e) => e.call_id === id && e.task_id);
+  const taskId = tagged?.task_id ?? events.find((e) => e.type === "task" && e.intake_call_id === id)?.task_id;
+  const task = events.find((e) => e.type === "task" && e.task_id === taskId);
+  if (!task) return null;
+  const mine = events.filter((e) => e.task_id === taskId);
+  const last = (type: string, vendor?: unknown) =>
+    [...mine].reverse().find((e) => e.type === type && (vendor === undefined || e.vendor === vendor));
+
+  const steps: Step[] = [{
+    key: "intake", Icon: PhoneIncoming, title: `${s(task.name)} called`,
+    caption: `${s(task.service)} · budget ${inr(task.budget)}`, call: s(task.intake_call_id) === "—" ? undefined : String(task.intake_call_id), state: "done",
+  }];
+  const dialled = mine.filter((e) => e.type === "vendor_call").map((e) => String(e.vendor));
+  const vendors = [...new Set([...dialled, ...((task.vendors as string[]) ?? [])])];
+  for (const v of vendors) {
+    const call = last("vendor_call", v);
+    const q = last("quote", v);
+    steps.push({
+      key: `v-${v}`, Icon: PhoneOutgoing, title: v,
+      caption: q ? (q.price ? `${priced(q)} · ${q.agreed ? "fits" : q.maybe ? "could fit" : "over budget"}` : s(q.notes)) : call ? "on the phone" : "next in line",
+      call: call?.call_id ? String(call.call_id) : undefined,
+      state: q ? "done" : call ? "live" : "waiting",
+    });
+  }
+  const counter = last("counter");
+  if (counter) steps.push({ key: "counter", Icon: Handshake, title: "Counter-offer", caption: `${inr(counter.offer)} to ${s(counter.vendor)}`, state: "done" });
+  const decision = last("decision");
+  const best = decision?.best as Record<string, unknown> | undefined;
+  steps.push({
+    key: "decision", Icon: Scales, title: "Best option",
+    caption: best ? `${s(best.vendor)} · ${priced(best)}` : decision ? "nobody available" : "after the quotes",
+    state: decision ? "done" : "waiting",
+  });
+  const callback = last("callback");
+  const booked = last("booked");
+  steps.push({
+    key: "callback", Icon: PhoneCall, title: `Call back ${s(task.name)}`,
+    caption: callback ? (booked ? "said yes" : "on the phone") : "with the options",
+    call: callback?.call_id ? String(callback.call_id) : undefined,
+    state: booked ? "done" : callback ? "live" : "waiting",
+  });
+  const change = [...mine].reverse().find((e) => e.type === "cancelled" || e.type === "rescheduled");
+  if (change) steps.push({ key: "change", Icon: CalendarX, title: change.type === "cancelled" ? "Cancelled" : "Rescheduled", caption: s(change.when), state: "done" });
+  steps.push({ key: "booked", Icon: CheckCircle, title: "Booked", caption: booked ? `${s(booked.vendor)} · ${priced(booked)}` : "", state: booked ? "done" : "waiting" });
+  const confirm = last("confirm_call");
+  const locked = last("locked");
+  steps.push({
+    key: "locked", Icon: Lock, title: "Price locked", caption: locked ? "on a recorded call" : confirm ? "confirming" : "",
+    call: confirm?.call_id ? String(confirm.call_id) : undefined, state: locked ? "done" : confirm ? "live" : "waiting",
+  });
+  const rated = last("rated");
+  steps.push({ key: "rated", Icon: Star, title: "Rated", caption: rated ? `★ ${s(rated.rating)}/5` : "after the job", state: rated ? "done" : "waiting" });
+
+  // Anything after a cancellation is skipped; otherwise the first waiting step is the one under way.
+  if (change?.type === "cancelled") for (const st of steps) if (st.state === "waiting") st.state = "skipped";
+  const quotes = vendors.map((v) => last("quote", v)).filter((q): q is Ev => !!q && Number(q.price) > 0);
+  const status = change?.type === "cancelled" ? "Cancelled" : rated ? "Done" : booked ? "Booked" : decision ? "Calling back" : "Finding people";
+  return { task, steps, quotes, status, calls: steps.map((st) => st.call).filter((c): c is string => !!c) };
+}
+
+function Graph({ steps, current }: { steps: Step[]; current: string }) {
+  return (
+    <ol className="relative flex gap-0 overflow-x-auto pb-2" data-lenis-prevent>
+      {steps.map((st, i) => {
+        const tone = st.state === "done" ? "bg-ink text-paper border-ink" : st.state === "live" ? "bg-bronze text-paper border-bronze" : "bg-paper text-muted border-line-strong";
+        const node = (
+          <div className="flex w-36 shrink-0 flex-col items-center text-center sm:w-40">
+            <div className="relative flex w-full items-center">
+              <span className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : steps[i - 1].state === "done" ? "bg-ink" : "border-t-2 border-dashed border-line-strong bg-transparent"}`} />
+              <span className={`relative grid size-12 place-items-center rounded-full border-2 ${tone} ${st.call === current ? "ring-4 ring-bronze/30" : ""}`}>
+                {st.state === "live" && <span className="absolute inset-0 animate-ping rounded-full bg-bronze/40" aria-hidden />}
+                <st.Icon className="relative size-5" weight={st.state === "done" ? "fill" : "regular"} />
+              </span>
+              <span className={`h-0.5 flex-1 ${i === steps.length - 1 ? "bg-transparent" : st.state === "done" ? "bg-ink" : "border-t-2 border-dashed border-line-strong bg-transparent"}`} />
+            </div>
+            <p className={`mt-3 text-sm font-semibold ${st.state === "waiting" || st.state === "skipped" ? "text-muted" : ""} ${st.state === "skipped" ? "line-through" : ""}`}>{st.title}</p>
+            {st.caption ? <p className="mt-0.5 px-2 text-xs text-muted">{st.caption}</p> : null}
+          </div>
+        );
+        return (
+          <li key={st.key}>
+            {st.call && st.call !== current ? (
+              <Link href={`/dashboard/call/${encodeURIComponent(st.call)}`} className="block rounded-2xl transition hover:bg-surface/70" title="Open this call">
+                {node}
+              </Link>
+            ) : node}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function PriceChart({ quotes, budget }: { quotes: Ev[]; budget: number }) {
+  if (!quotes.length) return null;
+  const top = Math.max(budget, ...quotes.flatMap((q) => [Number(q.opening) || 0, Number(q.price_max) || 0, Number(q.price) || 0])) * 1.1;
+  const pct = (v: number) => `${Math.min(100, (v / top) * 100)}%`;
+  return (
+    <section className="rounded-3xl border border-line bg-paper/80 p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="font-serif text-3xl">Price, from first word to deal</h2>
+        <p className="flex items-center gap-4 text-xs text-muted">
+          <span className="flex items-center gap-1.5"><span className="h-2 w-5 rounded-full bg-line-strong" /> opening</span>
+          <span className="flex items-center gap-1.5"><span className="h-2 w-5 rounded-full bg-bronze" /> final</span>
+          <span className="flex items-center gap-1.5"><span className="h-3 border-l-2 border-dashed border-safe" /> budget</span>
+        </p>
+      </div>
+      <ul className="relative mt-6 space-y-5">
+        <span className="pointer-events-none absolute -top-2 -bottom-2 border-l-2 border-dashed border-safe" style={{ left: `calc(9rem + (100% - 9rem) * ${budget / top})` }} aria-hidden>
+          <span className="absolute -top-5 -translate-x-1/2 text-xs whitespace-nowrap text-safe tabular-nums">{inr(budget)}</span>
+        </span>
+        {quotes.map((q) => {
+          const final = Number(q.price_max) || Number(q.price);
+          const opening = Number(q.opening) || 0;
+          return (
+            <li key={String(q.vendor)} className="grid grid-cols-[9rem_1fr] items-center gap-0">
+              <span className="truncate pr-3 text-sm font-semibold">{s(q.vendor)}</span>
+              <span className="relative h-8">
+                {opening > final && <span className="absolute inset-y-1 left-0 rounded-full bg-line-strong/70" style={{ width: pct(opening) }} title={`opened at ${inr(opening)}`} />}
+                <span className={`absolute inset-y-1 left-0 rounded-full ${q.agreed ? "bg-bronze" : "bg-bronze/45"}`} style={{ width: pct(final) }} />
+                <span className="absolute inset-y-0 flex items-center pl-2 text-xs font-semibold whitespace-nowrap tabular-nums" style={{ left: pct(Math.max(final, opening)) }}>
+                  {priced(q)}{Number(q.saved) > 0 ? <span className="ml-1.5 font-normal text-safe">−{inr(q.saved)}</span> : null}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export default function Journey({ id }: { id: string }) {
+  const [rows, setRows] = useState<Row[]>([]);
+  const [events, setEvents] = useState<Ev[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = () => fetch("/api/calls?full=1").then((r) => (r.ok ? r.json() : [])).then(setRows).catch(() => {}).finally(() => setLoaded(true));
+    load();
+    const t = setInterval(load, 15000);
+    const es = new EventSource("/api/events?full=1");
+    es.onmessage = (m) => {
+      const e: Ev = JSON.parse(m.data);
+      setEvents((prev) => (prev.some((p) => p.id === e.id) ? prev : [...prev, e]));
+    };
+    return () => { clearInterval(t); es.close(); };
+  }, []);
+
+  const row = rows.find((r) => r.call_id === id);
+  const j = useMemo(() => journey(id, events), [id, events]);
+  const related = j ? rows.filter((r) => j.calls.includes(r.call_id)) : row ? [row] : [];
+  const stats = [
+    ["Calls", related.length || "—"],
+    ["Talk time", related.length ? dur(related.reduce((a, r) => a + Number(r.duration_ms ?? 0), 0)) : "—"],
+    ["Cost", related.length ? inr(related.reduce((a, r) => a + Number(r.call_cost ?? 0), 0)) : "—"],
+    ["Bargained off", j ? inr(Math.max(0, ...j.quotes.map((q) => Number(q.saved) || 0))) : "—"],
+  ] as const;
+
+  return (
+    <div className="pb-24">
+      <nav className="pt-8 text-sm text-muted">
+        <Link href="/dashboard" className="hover:text-ink">Dashboard</Link> <ArrowRight className="inline size-3" /> <span className="tabular-nums">{id}</span>
+      </nav>
+
+      <header className="mt-4 flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <h1 className="font-serif text-[clamp(2.5rem,5vw,4rem)] leading-none">
+            {j ? <>{s(j.task.name)}&rsquo;s <em className="text-bronze">{s(j.task.service)}</em></> : row ? s(row.call_summary).split(".")[0] : "This call"}
+          </h1>
+          {j && (
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-muted">
+              {j.task.category_label ? <span className="label rounded-full border border-bronze/50 px-2 py-0.5 text-[0.7rem] text-bronze">{s(j.task.category_label)}</span> : null}
+              {s(j.task.area)} · {s(j.task.when) === "—" ? "as soon as possible" : s(j.task.when)} · budget {inr(j.task.budget)}
+            </p>
+          )}
+        </div>
+        {j && (
+          <span className={`stamp text-base ${j.status === "Cancelled" ? "text-scam" : j.status === "Booked" || j.status === "Done" ? "text-safe" : "text-pending"}`}>{j.status}</span>
+        )}
+      </header>
+
+      <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-5 sm:grid-cols-4">
+        {stats.map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-xs text-muted">{k}</dt>
+            <dd className="font-serif text-3xl tabular-nums">{v}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {j ? (
+        <section className="mt-10 rounded-3xl border border-line bg-paper/80 p-6">
+          <h2 className="flex items-center gap-2 font-serif text-3xl"><ChatCircleDots className="size-6 text-bronze" weight="duotone" /> The journey</h2>
+          <p className="mt-1 text-sm text-muted">Every call in this request. Click a step to open that call.</p>
+          <div className="mt-6"><Graph steps={j.steps} current={id} /></div>
+        </section>
+      ) : loaded && (
+        <p className="mt-10 rounded-3xl border border-line bg-surface/50 p-6 text-muted">
+          This call isn&rsquo;t part of a request yet. If it&rsquo;s a customer asking for a job, use{" "}
+          <span className="font-semibold text-ink">Find service people for this call</span> below to start one.
+        </p>
+      )}
+
+      {j && j.quotes.length > 0 && <div className="mt-6"><PriceChart quotes={j.quotes} budget={Number(j.task.budget)} /></div>}
+
+      <section className="mt-6 rounded-3xl border border-line bg-paper/80 p-6">
+        {row ? <Detail r={row} /> : <p className="text-muted">{loaded ? "Vaani hasn't listed this call yet. It appears a few seconds after the call starts." : "Loading the call…"}</p>}
+      </section>
+
+      {related.length > 1 && (
+        <p className="mt-6 text-sm text-muted">
+          Calls in this request:{" "}
+          {related.map((r, i) => (
+            <span key={r.call_id}>
+              {r.call_id === id ? <span className="font-semibold text-ink">{r.call_id}</span>
+                : <Link href={`/dashboard/call/${encodeURIComponent(r.call_id)}`} className="underline underline-offset-2 hover:text-ink">{r.call_id}</Link>}
+              {i < related.length - 1 ? " · " : ""}
+            </span>
+          ))}
+          {" "}({when(related[0]?.Start_time)})
+        </p>
+      )}
+    </div>
+  );
+}

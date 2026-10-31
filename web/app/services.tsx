@@ -1,4 +1,4 @@
-import { Bug, Drop, Car, CookingPot, DeviceMobile, Hammer, Lightning, PaintRoller, Snowflake, SprayBottle, Truck, WashingMachine } from "@phosphor-icons/react/dist/ssr";
+import { BugIcon as Bug, DropIcon as Drop, CarIcon as Car, CookingPotIcon as CookingPot, DeviceMobileIcon as DeviceMobile, HammerIcon as Hammer, LightningIcon as Lightning, PaintRollerIcon as PaintRoller, SnowflakeIcon as Snowflake, SprayBottleIcon as SprayBottle, TruckIcon as Truck, WashingMachineIcon as WashingMachine } from "@phosphor-icons/react/dist/ssr";
 
 const SERVICES = [
   [Snowflake, "AC repair"], [Drop, "Plumber"], [Lightning, "Electrician"], [Hammer, "Carpenter"],

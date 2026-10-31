@@ -1,4 +1,4 @@
-import { ArrowsClockwise, CalendarDots, CurrencyInr, EyeSlash, FileAudio, ListChecks, Lock, PiggyBank, Receipt, SealCheck, ShieldCheck, Star, Tag, Translate, TrendDown } from "@phosphor-icons/react/dist/ssr";
+import { ArrowsClockwiseIcon as ArrowsClockwise, CalendarDotsIcon as CalendarDots, CurrencyInrIcon as CurrencyInr, EyeSlashIcon as EyeSlash, FileAudioIcon as FileAudio, ListChecksIcon as ListChecks, LockIcon as Lock, PiggyBankIcon as PiggyBank, ReceiptIcon as Receipt, SealCheckIcon as SealCheck, ShieldCheckIcon as ShieldCheck, StarIcon as Star, TagIcon as Tag, TranslateIcon as Translate, TrendDownIcon as TrendDown } from "@phosphor-icons/react/dist/ssr";
 
 // Everything Sorted actually does today. Add a line here with every new feature.
 const FEATURES = [
