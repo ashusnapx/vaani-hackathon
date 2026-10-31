@@ -2,6 +2,7 @@
 
 import { ArrowClockwise, ArrowDownLeft, ArrowUpRight, Globe } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import Board from "../board";
 import Link from "next/link";
 
@@ -80,6 +81,29 @@ function Transcript({ text }: { text: unknown }) {
   );
 }
 
+function FindPeople({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    setBusy(true);
+    const t = toast.loading("Reading the call…");
+    const res = await fetch(`/api/calls/${encodeURIComponent(id)}/process`, { method: "POST" }).catch(() => null);
+    const body = res ? await res.json().catch(() => ({})) : {};
+    const ev = body.result as Record<string, unknown> | null;
+    if (!res?.ok) toast.error("Couldn't start", { id: t, description: String(body.detail ?? "Backend unreachable.") });
+    else if (ev?.type === "task")
+      toast.success(`Ringing ${(ev.vendors as string[])?.length ?? 0} service people`, { id: t, description: `${s(ev.service)} for ${s(ev.name)}, budget ${inr(ev.budget)}` });
+    else if (ev?.type === "intake_incomplete")
+      toast.error("The call is missing details", { id: t, description: `Missing: ${(ev.missing as string[])?.join(", ")}` });
+    else toast.success("Already handled", { id: t, description: "Nothing new to start from this call." });
+    setBusy(false);
+  }
+  return (
+    <button onClick={run} disabled={busy} className="pill-dark rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50">
+      {busy ? "Starting…" : "Find service people for this call"}
+    </button>
+  );
+}
+
 function Detail({ r }: { r: Row }) {
   const { Icon, text } = direction(r);
   const quality = (r.call_conversation_quality ?? {}) as Record<string, number>;
@@ -100,6 +124,7 @@ function Detail({ r }: { r: Row }) {
       </div>
       <p className="mt-3 font-serif text-3xl tabular-nums">{s(r.from_number)} → {String(r.to_number ?? "").length > 20 ? "Sorted" : s(r.to_number)}</p>
       <p className="mt-1 text-sm text-muted tabular-nums">{r.call_id} · {dur(r.duration_ms)} · {inr(r.call_cost)}</p>
+      {Boolean((r.call_entity as Record<string, unknown> | null)?.service) && <div className="mt-4"><FindPeople id={r.call_id} /></div>}
 
       <Section title="Recording">
         <audio controls preload="none" src={`/api/recording/${encodeURIComponent(r.call_id)}`} className="h-10 w-full" />
@@ -227,6 +252,19 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("call")) setSelected(q.get("call"));
+    if (q.get("dir")) setFilter(q.get("dir")!);
+  }, []);
+
+  const go = useCallback((call: string | null, dir: string) => {
+    const q = new URLSearchParams();
+    if (call) q.set("call", call);
+    if (dir !== "All") q.set("dir", dir);
+    window.history.replaceState(null, "", q.size ? `?${q}` : window.location.pathname);
+  }, []);
+
+  useEffect(() => {
     load();
     fetch("/api/agent").then((r) => (r.ok ? r.json() : null)).then(setAgent).catch(() => {});
     const t = setInterval(load, 15000);
@@ -285,7 +323,7 @@ export default function Dashboard() {
         <section>
           <div className="flex flex-wrap items-center gap-2">
             {["All", "Inbound", "Outbound", "Web"].map((f) => (
-              <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f}
+              <button key={f} onClick={() => { setFilter(f); go(selected, f); }} aria-pressed={filter === f}
                 className={`rounded-full border px-3 py-1 text-sm ${filter === f ? "border-ink bg-ink text-paper" : "border-line-strong hover:border-ink"}`}>
                 {f}
               </button>
@@ -300,7 +338,14 @@ export default function Dashboard() {
                 const tag = Object.values((r.call_eval_tag ?? {}) as Record<string, unknown>)[0];
                 return (
                   <li key={r.call_id}>
-                    <button onClick={() => setSelected(r.call_id)} aria-current={r.call_id === selected}
+                    <a href={`/dashboard?call=${encodeURIComponent(r.call_id)}`}
+                      onClick={(e) => {
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return; // new tab keeps working
+                        e.preventDefault();
+                        setSelected(r.call_id);
+                        go(r.call_id, filter);
+                      }}
+                      aria-current={r.call_id === selected ? "page" : undefined}
                       className={`grid w-full grid-cols-[1.5rem_1fr_auto] items-start gap-3 px-2 py-3 text-left transition ${r.call_id === selected ? "bg-surface" : "hover:bg-surface/60"}`}>
                       <Icon className="mt-1 size-4 text-bronze" aria-label={text} />
                       <span className="min-w-0">
@@ -315,7 +360,7 @@ export default function Dashboard() {
                         {dur(r.duration_ms)}
                         <span className="block text-xs text-muted">{when(r.Start_time)}</span>
                       </span>
-                    </button>
+                    </a>
                   </li>
                 );
               })}

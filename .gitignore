@@ -6,3 +6,5 @@ docs/vaani/*
 __pycache__/
 *.local.md
 backend/vendors.json
+backend/state.json
+backend/state.json.tmp

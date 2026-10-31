@@ -96,16 +96,35 @@ VAANI = "https://api.vaanivoice.ai/api"
 AGENT_ID = _read("agent", "agent_id.txt")
 INTAKE_PROMPT = _read("agent", "prompt.md")
 
-# shortcut: state lives in memory and vanishes on restart, fine for one demo day
 EVENTS: list[dict] = []
 TASKS: dict[str, dict] = {}
 PLACED: dict[str, dict] = {}  # call_id we dialled -> {"kind", "task_id", "vendor"}
 SEEN: set[str] = set()
 LOCK = threading.Lock()
 
+# Requests, the calls we placed and the calls we've handled survive a restart (gitignored file).
+STATE_FILE = os.path.join(os.path.dirname(__file__), "state.json")
+PERSIST = os.getenv("PERSIST", "1") == "1"
+if PERSIST and os.path.exists(STATE_FILE):
+    _saved = json.load(open(STATE_FILE))
+    EVENTS.extend(_saved.get("events", []))
+    TASKS.update(_saved.get("tasks", {}))
+    PLACED.update(_saved.get("placed", {}))
+    SEEN.update(_saved.get("seen", []))
+
+
+def save_state() -> None:
+    if not PERSIST:
+        return
+    tmp = STATE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump({"events": EVENTS[-1000:], "tasks": TASKS, "placed": PLACED, "seen": sorted(SEEN)}, f)
+    os.replace(tmp, STATE_FILE)
+
 
 def publish(kind: str, **data) -> None:
     EVENTS.append({"id": len(EVENTS) + 1, "type": kind, "at": time.time(), **data})
+    save_state()
 
 
 def authorised(key: str | None) -> None:
@@ -653,7 +672,9 @@ def handle(row: dict) -> bool:
         if yes(e.get("emergency")) or yes(e.get("abuse_or_manipulation")):
             publish("intake_skipped", call_id=call_id, reason="emergency or abuse")
             return True
-        phone = e.get("callback_number") or placed.get("phone") or row.get("from_number")
+        # On a call Sorted placed, the customer is the number we rang, not the one we rang from.
+        outbound = "out" in str(row.get("direction") or row.get("call_type") or "").lower()
+        phone = e.get("callback_number") or placed.get("phone") or row.get("to_number" if outbound else "from_number")
         intent = str(e.get("intent") or "").lower()
         if intent in ("cancel", "reschedule"):
             change_request(phone, intent, e.get("new_time"))
@@ -705,18 +726,39 @@ def history(page_size: int = 50) -> list[dict]:
 
 
 def poll_forever() -> None:
-    try:
-        SEEN.update(row["call_id"] for row in history(200))  # calls from before this run are history
-    except httpx.HTTPError as e:
-        print("first poll failed:", e)
+    if not SEEN:  # first run ever: calls from before Sorted existed are history
+        try:
+            SEEN.update(row["call_id"] for row in history(200))
+            save_state()
+        except httpx.HTTPError as e:
+            print("first poll failed:", e)
     while True:
         time.sleep(POLL_SECONDS)
         try:
             for row in reversed(history()):
                 if row["call_id"] not in SEEN and handle(row):
                     SEEN.add(row["call_id"])
+                    save_state()
         except Exception as e:  # keep polling through a bad row or a network blip
             print("poll failed:", e)
+
+
+@app.post("/calls/{call_id}/process")
+def process_call(call_id: str, key: str | None = Query(None)):
+    """Run one finished call through Sorted now, e.g. a customer's call from before a restart."""
+    authorised(key)
+    row = next((r for r in history(200) if r.get("call_id") == call_id), None)
+    if not row:
+        raise HTTPException(status_code=404, detail="That call isn't in this agent's history")
+    if row.get("post_processing_status") != "completed":
+        raise HTTPException(status_code=409, detail="Vaani is still processing this call. Try again in a minute.")
+    before = len(EVENTS)
+    SEEN.discard(call_id)
+    handle(row)
+    SEEN.add(call_id)
+    save_state()
+    started = next((e for e in EVENTS[before:] if e["type"] in ("task", "intake_incomplete", "intake_skipped")), None)
+    return {"ok": True, "result": started}
 
 
 @app.on_event("startup")

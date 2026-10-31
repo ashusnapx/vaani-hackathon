@@ -24,6 +24,11 @@ def env(key: str) -> str:
 
 H = {"X-API-Key": env("VAANI_API_KEY")}
 
+# One list of job categories: the backend's. Vaani can only tag a request with one Sorted has.
+os.environ.update(POLL="0", PERSIST="0")
+sys.path.insert(0, str(HERE.parent / "backend"))
+from app import CATEGORIES  # noqa: E402
+
 persona = {
     "identity": {
         "system_prompt": (HERE / "prompt.md").read_text(),
@@ -117,7 +122,7 @@ analysis = {
                 {"name": "customer_name", "prompt": "The caller's name.", "nullable": True},
                 {"name": "callback_number", "prompt": "A 10-digit mobile number the caller asked to be called back on, digits only, if they gave one.", "nullable": True},
                 {"name": "service", "prompt": "The kind of service needed, in a few words, e.g. AC repair, plumber.", "nullable": True},
-                {"name": "category", "prompt": "Which one category the job belongs to.", "values": ["ac_repair", "appliance_repair", "plumbing", "electrical", "carpentry", "painting", "cleaning", "pest_control", "phone_repair", "vehicle_repair", "movers", "other"], "nullable": True},
+                {"name": "category", "prompt": "Which one category the job belongs to: " + ", ".join(f"{k} ({v[0]})" for k, v in CATEGORIES.items()) + ".", "values": list(CATEGORIES), "nullable": True},
                 {"name": "details", "prompt": "The issue in the caller's own words.", "nullable": True},
                 {"name": "address", "prompt": "The full address given.", "nullable": True},
                 {"name": "area", "prompt": "The locality only, e.g. Koramangala.", "nullable": True},

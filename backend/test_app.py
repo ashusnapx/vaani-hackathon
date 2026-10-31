@@ -2,7 +2,7 @@ import json
 import os
 
 os.environ.update(
-    DOORMAN_KEY="k", VAANI_API_KEY="", POLL="0", WAVE_TIMEOUT="3600",
+    DOORMAN_KEY="k", VAANI_API_KEY="", POLL="0", PERSIST="0", WAVE_TIMEOUT="3600",
     VENDORS=json.dumps([
         {"name": "A", "phone": "+91 90000 00001", "services": ["ac_repair"]},
         {"name": "B", "phone": "+91 90000 00002", "services": ["ac_repair"]},
@@ -384,3 +384,23 @@ def test_call_me_says_so_when_vaani_refuses(monkeypatch):
     monkeypatch.setattr(m, "dispatch", lambda *a, **k: None)
     r = c.post("/actions/call-me", params={"key": "k"}, json={"name": "Asha", "phone": "9876543210"})
     assert r.status_code == 502 and "couldn't place the call" in r.json()["detail"]
+
+
+def test_customer_number_on_a_call_sorted_placed_is_the_number_it_rang():
+    m.TASKS.clear()
+    m.handle({"call_id": "out-x", "call_status": "Completed", "post_processing_status": "completed",
+              "direction": "outbound", "from_number": "+918064279097", "to_number": "+919876543210",
+              "call_entity": {"customer_name": "Asha", "service": "AC repair", "budget": "800"}})
+    assert next(iter(m.TASKS.values()))["phone"] == "+919876543210"
+
+
+def test_process_endpoint_runs_one_finished_call(monkeypatch):
+    m.TASKS.clear()
+    row = {"call_id": "late-1", "call_status": "Completed", "post_processing_status": "completed",
+           "from_number": "+919876543210", "call_entity": {"customer_name": "Asha", "service": "plumber", "details": "tap leaking", "budget": "500"}}
+    monkeypatch.setattr(m, "history", lambda page_size=50: [row, {"call_id": "busy-1", "post_processing_status": "processing"}])
+    q = {"key": "k"}
+    r = c.post("/calls/late-1/process", params=q).json()
+    assert r["result"]["type"] == "task" and len(m.TASKS) == 1
+    assert c.post("/calls/busy-1/process", params=q).status_code == 409
+    assert c.post("/calls/nope/process", params=q).status_code == 404
