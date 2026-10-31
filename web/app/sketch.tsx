@@ -14,7 +14,7 @@ function drawOn(paths: SVGPathElement[], delay = 0) {
 }
 
 /** An SVG of pencil strokes (computed on the server) that sketch themselves in when scrolled into view. */
-export function Sheet({ paths, children, label }: { paths: Stroke[]; children?: ReactNode; label: string }) {
+export function Sheet({ paths, children, label, viewBox = "0 0 520 300", className = "h-auto w-full" }: { paths: Stroke[]; children?: ReactNode; label: string; viewBox?: string; className?: string }) {
   const svg = useRef<SVGSVGElement>(null);
   const layer = useRef<SVGGElement>(null);
 
@@ -33,7 +33,7 @@ export function Sheet({ paths, children, label }: { paths: Stroke[]; children?: 
   }, []);
 
   return (
-    <svg ref={svg} viewBox="0 0 520 300" className="h-auto w-full" role="img" aria-label={label}>
+    <svg ref={svg} viewBox={viewBox} className={className} role="img" aria-label={label}>
       <g ref={layer}>
         {paths.map((p, i) => <path key={i} d={p.d} stroke={p.stroke} strokeWidth={p.strokeWidth} fill={p.fill} strokeLinecap="round" />)}
       </g>

@@ -69,6 +69,49 @@ function drawAfter(rc: Gen) {
 
 const BEFORE = strokes(7, drawBefore);
 const AFTER = strokes(11, drawAfter);
+// The people in a request's call thread, in a 100×100 box: the customer on the phone,
+// service people with a cap, spanner and toolbox, and a pencil ring for Sorted's logo.
+const FINE = { ...PENCIL, strokeWidth: 1.6, roughness: 1.1, bowing: 0.8 };
+const FINE_BRONZE = { ...FINE, stroke: "#8c6b45" };
+const HATCH = { fillStyle: "hachure", hachureGap: 3 } as const;
+
+function customer(rc: Gen) {
+  return [
+    rc.circle(44, 24, 22, FINE),
+    rc.line(44, 35, 44, 68, FINE),
+    rc.line(44, 68, 34, 94, FINE), rc.line(44, 68, 54, 94, FINE),
+    rc.line(44, 44, 30, 62, FINE),
+    rc.line(44, 44, 59, 47, FINE), rc.line(59, 47, 59, 33, FINE),
+    rc.rectangle(55, 15, 9, 18, { ...FINE, fill: "#3b3a3633", ...HATCH }),
+    rc.arc(66, 24, 10, 14, -Math.PI / 3, Math.PI / 3, false, FINE),
+    rc.arc(66, 24, 20, 26, -Math.PI / 3, Math.PI / 3, false, FINE),
+  ];
+}
+
+function mechanic(rc: Gen) {
+  return [
+    rc.circle(44, 27, 22, FINE),
+    rc.path("M33 25 Q44 6 55 25 Z", { ...FINE_BRONZE, fill: "#8c6b4540", ...HATCH }),
+    rc.line(52, 25, 65, 27, FINE_BRONZE),
+    rc.line(44, 38, 44, 70, FINE),
+    rc.line(44, 70, 34, 95, FINE), rc.line(44, 70, 54, 95, FINE),
+    rc.line(44, 46, 62, 40, FINE),
+    rc.line(60, 43, 75, 24, { ...FINE_BRONZE, strokeWidth: 2.6 }),
+    rc.circle(78, 19, 11, FINE_BRONZE),
+    rc.line(44, 46, 28, 57, FINE),
+    rc.rectangle(14, 62, 26, 15, { ...FINE, fill: "#3b3a3622", ...HATCH }),
+    rc.path("M21 62 Q27 53 33 62", FINE),
+  ];
+}
+
+export type People = { customer: Stroke[]; vendors: Stroke[][]; sorted: Stroke[] };
+export const PEOPLE: People = {
+  customer: strokes(21, customer),
+  // a few seeds, so two service people side by side aren't drawn stroke for stroke the same
+  vendors: [31, 32, 33].map((seed) => strokes(seed, mechanic)),
+  sorted: strokes(41, (rc) => [rc.circle(50, 50, 88, { ...FINE_BRONZE, roughness: 1.5 }), rc.circle(51, 49, 82, { ...FINE_BRONZE, strokeWidth: 0.9 })]),
+};
+
 export const RING = strokes(3, (rc) => [rc.ellipse(100, 30, 192, 52, { ...BRONZE, strokeWidth: 2, roughness: 2.2 })]);
 
 export function BeforeSketch() {

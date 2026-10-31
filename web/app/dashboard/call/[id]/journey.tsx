@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowRightIcon as ArrowRight, CalendarXIcon as CalendarX, ChatCircleDotsIcon as ChatCircleDots, CheckCircleIcon as CheckCircle, HandshakeIcon as Handshake, LockIcon as Lock, PhoneCallIcon as PhoneCall, PhoneIncomingIcon as PhoneIncoming, PhoneOutgoingIcon as PhoneOutgoing, ScalesIcon as Scales, StarIcon as Star } from "@phosphor-icons/react";
-import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { type Ev, type Row, Detail, dur, inr, s, when } from "../../call-detail";
+import { Sheet } from "../../../sketch";
+import type { People, Stroke } from "../../../sketch-art";
 
 type Step = {
   key: string;
@@ -186,7 +187,7 @@ function lines(text: unknown, n = 3) {
     .map((m) => ({ agent: (m[1] ?? "").toUpperCase() === "AGENT", text: m[2].length > 110 ? `${m[2].slice(0, 110)}…` : m[2] }));
 }
 
-type Lane = { key: string; name: string; role: string };
+type Lane = { key: string; name: string; role: string; art: Stroke[] };
 
 /** Place one call of a request again, e.g. a callback that was declined or unclear. */
 function CallAgain({ task, step, who }: { task: string; step: string; who: string }) {
@@ -228,14 +229,14 @@ function AskRating({ task, who }: { task: string; who: string }) {
 }
 
 /** Who talked to whom, in order: one lifeline per person, one arrow per call. */
-function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: Row[]; task: Ev; current: string; booked: string }) {
+function Thread({ steps, rows, task, current, booked, people }: { steps: Step[]; rows: Row[]; task: Ev; current: string; booked: string; people: People }) {
   const [open, setOpen] = useState<string | null>(current);
   const calls = steps.filter((st) => st.call);
   const vendorNames = [...new Set(calls.filter((st) => st.key.startsWith("v-") || st.key === "locked").map((st) => (st.key === "locked" ? "" : st.title)).filter(Boolean))];
   const lanes: Lane[] = [
-    { key: "customer", name: s(task.name), role: "Customer" },
-    { key: "sorted", name: "Sorted", role: "Vaani agent" },
-    ...vendorNames.map((v) => ({ key: `v-${v}`, name: v, role: "Service person" })),
+    { key: "customer", name: s(task.name), role: "Customer", art: people.customer },
+    { key: "sorted", name: "Sorted", role: "Vaani agent", art: people.sorted },
+    ...vendorNames.map((v, i) => ({ key: `v-${v}`, name: v, role: "Service person", art: people.vendors[i % people.vendors.length] })),
   ];
   const at = (key: string) => lanes.findIndex((l) => l.key === key);
   const center = (i: number) => ((i + 0.5) / lanes.length) * 100;
@@ -249,17 +250,15 @@ function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: R
         <div className="relative min-w-[36rem]">
           {/* lifelines */}
           {lanes.map((l, i) => (
-            <span key={l.key} className="pointer-events-none absolute top-16 bottom-0 border-l-2 border-dashed border-line-strong" style={{ left: `${center(i)}%` }} aria-hidden />
+            <span key={l.key} className="pointer-events-none absolute top-36 bottom-0 border-l-2 border-dashed border-line-strong" style={{ left: `${center(i)}%` }} aria-hidden />
           ))}
           {/* people */}
           <div className="relative grid" style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))` }}>
             {lanes.map((l) => (
               <div key={l.key} className="flex flex-col items-center text-center">
-                {l.key === "sorted" ? (
-                  <span className="grid size-12 place-items-center rounded-full border border-line bg-paper"><Image src="/vaani-logo.png" alt="" width={30} height={27} /></span>
-                ) : (
-                  <span className={`grid size-12 place-items-center rounded-full font-serif text-xl ${l.key === "customer" ? "pill-dark" : "bg-surface-2 text-ink"}`}>{l.name.slice(0, 1)}</span>
-                )}
+                <Sheet paths={l.art} label={`${l.role}: ${l.name}`} viewBox="0 0 100 100" className="size-24 bg-paper">
+                  {l.key === "sorted" && <image href="/vaani-logo.png" x="27" y="30" width="46" height="41" />}
+                </Sheet>
                 <p className="mt-1 text-sm font-semibold">{l.name}</p>
                 <p className="text-xs text-muted">{l.role}</p>
               </div>
@@ -319,7 +318,7 @@ function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: R
   );
 }
 
-export default function Journey({ id, request }: { id: string; request?: string }) {
+export default function Journey({ id, request, people }: { id: string; request?: string; people: People }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [events, setEvents] = useState<Ev[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -405,7 +404,7 @@ export default function Journey({ id, request }: { id: string; request?: string 
       {j && j.quotes.length > 0 && <div className="mt-6"><PriceChart quotes={j.quotes} budget={Number(j.task.budget)} /></div>}
 
       {j ? (
-        <Thread steps={j.steps} rows={rows} task={j.task} current={id} booked={j.booked} />
+        <Thread steps={j.steps} rows={rows} task={j.task} current={id} booked={j.booked} people={people} />
       ) : (
         <section id={`call-${id}`} className="mt-6 rounded-3xl border border-line bg-paper/80 p-6">
           {row ? <Detail r={row} /> : <p className="text-muted">{loaded ? "Vaani hasn't listed this call yet." : "Loading the call…"}</p>}
