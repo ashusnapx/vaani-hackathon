@@ -56,6 +56,20 @@ experience = {
     },
 }
 
+# The facts a judge is most likely to test, answered without a RAG lookup.
+training = {
+    "know_how": {
+        "faq": {
+            "Is digital arrest real?": "No. Digital arrest does not exist in Indian law. Police, CBI or customs never arrest anyone or ask for money on a phone or video call.",
+            "Does the bank ask for OTP or PIN?": "Never. Banks and RBI never ask for an OTP, PIN, CVV or password on a call.",
+            "Where do I report a fraud call or lost money?": "Call 1930 right away, or file at cybercrime.gov.in. Suspicious calls and SMS can be reported on Chakshu at sancharsaathi.gov.in.",
+            "Do I need my UPI PIN to receive money?": "No. A UPI PIN is only for sending money. Anyone asking for it to send you money is a fraud.",
+            "A caller asked me to install AnyDesk or TeamViewer": "Never install an app because a caller asked. If it is installed, uninstall it, switch off the internet and call the bank on its official number.",
+            "I already paid or shared my OTP": "Call 1930 now, then call the bank on the number on the back of the card to block it. Do not send more money, even for a refund.",
+        }
+    }
+}
+
 TAGS = {
     "SCAM_BLOCKED": "caller tried to get money, OTP, details or an app, and Doorman refused",
     "MESSAGE_TAKEN": "a genuine caller left a message",
@@ -112,7 +126,7 @@ else:
     id_file.write_text(agent_id + "\n")
     print("created", agent_id)
 
-for section, body in [("persona", persona), ("experience", experience), ("analysis", analysis)]:
+for section, body in [("persona", persona), ("training", training), ("experience", experience), ("analysis", analysis)]:
     r = httpx.patch(f"{API}/agent/{agent_id}/{section}", headers=H, json=body, timeout=60)
     print(section, r.status_code, "" if r.is_success else r.text[:400])
     if not r.is_success:
