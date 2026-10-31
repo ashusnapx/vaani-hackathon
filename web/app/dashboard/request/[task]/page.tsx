@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import Journey from "../../call/[id]/journey";
 
-export const metadata: Metadata = { title: "Sorted — request" };
+export const metadata: Metadata = { title: "Request", robots: { index: false, follow: false } };
 
 // The call id is request-time data, so it is read inside a Suspense boundary (Cache Components).
 async function Body({ params }: { params: PageProps<"/dashboard/request/[task]">["params"] }) {

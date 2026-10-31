@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Dashboard from "./dashboard";
 
-export const metadata: Metadata = { title: "Sorted — dashboard" };
+export const metadata: Metadata = { title: "Dashboard", robots: { index: false, follow: false } };
 
 export default function DashboardPage() {
   return (

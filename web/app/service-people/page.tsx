@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Vendors from "./vendors";
 
-export const metadata: Metadata = { title: "Sorted — service people" };
+export const metadata: Metadata = { title: "Service people", robots: { index: false, follow: false } };
 
 export default function ServicePeoplePage() {
   return (

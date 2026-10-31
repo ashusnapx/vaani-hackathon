@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, Instrument_Serif, Kalam, Manrope } from "next/font/google";
 import { CheckCircleIcon as CheckCircle, InfoIcon as Info, SpinnerGapIcon as SpinnerGap, WarningCircleIcon as WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { Toaster } from "sonner";
@@ -15,9 +15,26 @@ const instrument = Instrument_Serif({
   style: ["normal", "italic"],
 });
 
+const site = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const description =
+  "Call once with the job, your address and your price. Sorted, a Vaani voice agent, rings local plumbers, electricians and AC mechanics, bargains in their language, and calls you back with whoever agreed.";
+
 export const metadata: Metadata = {
-  title: "Sorted — one call, and it's sorted",
-  description: "Call once with the job and your price. Sorted rings local service people, bargains, and calls you back with whoever agreed.",
+  metadataBase: new URL(site),
+  title: { default: "Sorted: one call, and it's sorted", template: "%s · Sorted" },
+  description,
+  applicationName: "Sorted",
+  keywords: ["home services", "plumber", "electrician", "AC repair", "voice agent", "Vaani", "Bengaluru", "get quotes", "book a repair"],
+  alternates: { canonical: "/" },
+  openGraph: { type: "website", url: "/", siteName: "Sorted", locale: "en_IN", title: "Sorted: one call, and it's sorted", description },
+  twitter: { card: "summary_large_image", title: "Sorted: one call, and it's sorted", description },
+  robots: { index: true, follow: true },
+  category: "home services",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f7f3ec",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

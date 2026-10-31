@@ -24,9 +24,23 @@ const flow = [
   [HandCoins, "You get a yes", "Sorted calls back with whoever agreed, the best one first and a backup, and their number."],
 ] as const;
 
+// What Sorted is, for search engines that read structured data.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: "Sorted",
+  serviceType: "Home repair booking by phone",
+  description: "Call once with the job and your price. Sorted rings local service people, bargains, and calls you back with whoever agreed.",
+  areaServed: { "@type": "Country", name: "India" },
+  availableChannel: { "@type": "ServiceChannel", servicePhone: { "@type": "ContactPoint", telephone: "+91-80642-79097", contactType: "customer service",
+    availableLanguage: ["English", "Hindi", "Kannada", "Tamil", "Telugu", "Malayalam", "Marathi", "Bengali", "Gujarati", "Punjabi", "Odia"] } },
+  provider: { "@type": "Organization", name: "Sorted" },
+};
+
 export default function Home() {
   return (
     <ReactLenis root>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="mx-auto max-w-[88rem] px-4 sm:px-8">
         <header className="flex items-center justify-between gap-4 border-b border-line py-5">
           <p className="flex items-center gap-2">
