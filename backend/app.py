@@ -690,7 +690,9 @@ def handle(row: dict) -> bool:
             publish("intake_incomplete", call_id=call_id, missing=res["missing"], name=clean(e.get("customer_name"), 40))
     elif kind == "vendor_call":
         ok = str(e.get("can_do_job") or "").lower() != "no"
-        quote_in(placed["task_id"], placed["vendor"], e.get("price_min") if ok else 0,
+        # If Vaani filed their price under the customer's "budget" field, it is still their price.
+        price = e.get("price_min") or (e.get("budget") if not e.get("price_max") else None)
+        quote_in(placed["task_id"], placed["vendor"], price if ok else 0,
                  e.get("price_max") if ok else None, e.get("eta") or "",
                  e.get("notes") or ("" if ok else "declined"), e.get("pricing_basis") or "",
                  e.get("opening_price"), e.get("all_inclusive"), e.get("arrival_hours"))

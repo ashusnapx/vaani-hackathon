@@ -18,18 +18,31 @@ const priced = (q?: Record<string, unknown> | null) =>
   !q || !q.price ? "—" : `${inr(q.price)}${q.price_max ? `–${Number(q.price_max).toLocaleString("en-IN")}` : ""}${q.open ? "+" : ""}`;
 
 /** Every step a request takes, rebuilt from Sorted's event log. */
-function journey(id: string, events: Ev[]) {
+function journey(id: string, events: Ev[], row?: Row, rows: Row[] = []) {
   const tagged = events.find((e) => e.call_id === id && e.task_id);
-  const taskId = tagged?.task_id ?? events.find((e) => e.type === "task" && e.intake_call_id === id)?.task_id;
+  const said = (row?.call_entity ?? {}) as Record<string, unknown>;
+  const taskId = tagged?.task_id
+    ?? events.find((e) => e.type === "task" && e.intake_call_id === id)?.task_id
+    // a customer call from before requests remembered their first call: match who and what
+    ?? events.find((e) => e.type === "task" && !e.intake_call_id && said.customer_name && e.name === said.customer_name && e.service === said.service)?.task_id;
   const task = events.find((e) => e.type === "task" && e.task_id === taskId);
   if (!task) return null;
   const mine = events.filter((e) => e.task_id === taskId);
+  // The customer's first call: recorded on the request, or else the earliest call from them about this
+  // job that isn't one Sorted placed for the request.
+  const placed = new Set(mine.map((e) => e.call_id).filter(Boolean));
+  const intake = task.intake_call_id ? String(task.intake_call_id)
+    : [...rows].reverse().find((r) => {
+        const e = (r.call_entity ?? {}) as Record<string, unknown>;
+        return !placed.has(r.call_id) && e.customer_name === task.name && e.service === task.service;
+      })?.call_id;
   const last = (type: string, vendor?: unknown) =>
     [...mine].reverse().find((e) => e.type === type && (vendor === undefined || e.vendor === vendor));
 
   const steps: Step[] = [{
     key: "intake", Icon: PhoneIncoming, title: `${s(task.name)} called`,
-    caption: `${s(task.service)} · budget ${inr(task.budget)}`, call: s(task.intake_call_id) === "—" ? undefined : String(task.intake_call_id), state: "done",
+    caption: `${s(task.service)} · budget ${inr(task.budget)}`,
+    call: intake, state: "done",
   }];
   const dialled = mine.filter((e) => e.type === "vendor_call").map((e) => String(e.vendor));
   const vendors = [...new Set([...dialled, ...((task.vendors as string[]) ?? [])])];
@@ -100,10 +113,10 @@ function Graph({ steps, current }: { steps: Step[]; current: string }) {
         );
         return (
           <li key={st.key}>
-            {st.call && st.call !== current ? (
-              <Link href={`/dashboard/call/${encodeURIComponent(st.call)}`} className="block rounded-2xl transition hover:bg-surface/70" title="Open this call">
+            {st.call ? (
+              <a href={`#call-${st.call}`} className="block rounded-2xl transition hover:bg-surface/70" title="Jump to this call">
                 {node}
-              </Link>
+              </a>
             ) : node}
           </li>
         );
@@ -169,7 +182,14 @@ export default function Journey({ id }: { id: string }) {
   }, []);
 
   const row = rows.find((r) => r.call_id === id);
-  const j = useMemo(() => journey(id, events), [id, events]);
+  // Land on the call that was opened, once its section exists.
+  const [landed, setLanded] = useState(false);
+  useEffect(() => {
+    if (landed || !rows.length) return;
+    const el = document.getElementById(`call-${id}`);
+    if (el) { el.scrollIntoView({ block: "start" }); setLanded(true); }
+  });
+  const j = useMemo(() => journey(id, events, row, rows), [id, events, row, rows]);
   const related = j ? rows.filter((r) => j.calls.includes(r.call_id)) : row ? [row] : [];
   const stats = [
     ["Calls", related.length || "—"],
@@ -225,9 +245,17 @@ export default function Journey({ id }: { id: string }) {
 
       {j && j.quotes.length > 0 && <div className="mt-6"><PriceChart quotes={j.quotes} budget={Number(j.task.budget)} /></div>}
 
-      <section className="mt-6 rounded-3xl border border-line bg-paper/80 p-6">
-        {row ? <Detail r={row} /> : <p className="text-muted">{loaded ? "Vaani hasn't listed this call yet. It appears a few seconds after the call starts." : "Loading the call…"}</p>}
-      </section>
+      {(j ? j.steps.filter((st) => st.call) : row ? [{ key: "only", title: "This call", call: id } as Step] : []).map((st) => {
+        const r = rows.find((x) => x.call_id === st.call);
+        return (
+          <section key={st.key} id={`call-${st.call}`}
+            className={`mt-6 scroll-mt-6 rounded-3xl border bg-paper/80 p-6 ${st.call === id ? "border-bronze/60" : "border-line"}`}>
+            <h2 className="mb-4 font-serif text-2xl">{st.title}</h2>
+            {r ? <Detail r={r} /> : <p className="text-muted">{loaded ? "Vaani hasn't listed this call yet. It appears a few seconds after the call starts." : "Loading the call…"}</p>}
+          </section>
+        );
+      })}
+      {!j && !row && loaded && <p className="mt-6 text-muted">Vaani hasn&rsquo;t listed this call yet.</p>}
 
       {related.length > 1 && (
         <p className="mt-6 text-sm text-muted">
@@ -235,7 +263,7 @@ export default function Journey({ id }: { id: string }) {
           {related.map((r, i) => (
             <span key={r.call_id}>
               {r.call_id === id ? <span className="font-semibold text-ink">{r.call_id}</span>
-                : <Link href={`/dashboard/call/${encodeURIComponent(r.call_id)}`} className="underline underline-offset-2 hover:text-ink">{r.call_id}</Link>}
+                : <a href={`#call-${r.call_id}`} className="underline underline-offset-2 hover:text-ink">{r.call_id}</a>}
               {i < related.length - 1 ? " · " : ""}
             </span>
           ))}

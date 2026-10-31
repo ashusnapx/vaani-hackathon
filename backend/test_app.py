@@ -404,3 +404,20 @@ def test_process_endpoint_runs_one_finished_call(monkeypatch):
     assert r["result"]["type"] == "task" and len(m.TASKS) == 1
     assert c.post("/calls/busy-1/process", params=q).status_code == 409
     assert c.post("/calls/nope/process", params=q).status_code == 404
+
+
+def test_a_request_remembers_the_call_that_started_it():
+    m.TASKS.clear()
+    m.handle({"call_id": "in-link", "call_status": "Completed", "post_processing_status": "completed",
+              "from_number": "+919876543210", "call_entity": {"customer_name": "Asha", "service": "AC repair", "budget": "800"}})
+    assert next(iter(m.TASKS.values()))["intake_call_id"] == "in-link"
+    assert next(e for e in reversed(m.EVENTS) if e["type"] == "task")["intake_call_id"] == "in-link"
+
+
+def test_vendor_price_filed_under_budget_is_still_their_price():
+    t = task(budget="1000")["task_id"]
+    m.TASKS[t]["in_wave"] = ["A"]
+    m.PLACED["v-b"] = {"kind": "vendor_call", "task_id": t, "vendor": "A"}
+    m.handle({"call_id": "v-b", "call_status": "Completed", "post_processing_status": "completed",
+              "call_entity": {"customer_name": "A", "budget": 300, "request_confirmed": True}})
+    assert m.TASKS[t]["quotes"]["A"]["price"] == 300 and m.TASKS[t]["quotes"]["A"]["agreed"]
