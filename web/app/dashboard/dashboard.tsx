@@ -98,33 +98,6 @@ function Requests({ events, rows }: { events: Ev[]; rows: Row[] }) {
   );
 }
 
-const EVENT_TEXT: Record<string, (e: Ev) => string> = {
-  task: (e) => `${s(e.name)} asked for ${s(e.service)} (${s(e.category_label)}) in ${s(e.area)}, budget ${inr(e.budget)}; ringing ${(e.vendors as string[])?.length ?? 0}`,
-  vendor_call: (e) => `Calling ${s(e.vendor)} (${s(e.status)})`,
-  quote: (e) => !e.price ? `${s(e.vendor)}: ${s(e.notes)}`
-    : `${s(e.vendor)} quoted ${inr(e.price)}${e.price_max ? `–${Number(e.price_max).toLocaleString("en-IN")}` : ""}${e.open ? "+" : ""} (${s(e.basis)}), ${e.agreed ? "fits budget" : e.maybe ? "could fit" : "over budget"}`,
-  wave: (e) => s(e.note),
-  decision: (e) => `Decision: ${s(e.mode)}${e.best ? `, best ${s((e.best as Record<string, unknown>).vendor)}` : ""}`,
-  callback: (e) => `Calling ${s(e.to)} back (${s(e.status)})`,
-  booked: (e) => `Booked ${s(e.vendor)} at ${inr(e.price)}, ${s(e.eta)}`,
-  confirm_call: (e) => `Confirming with ${s(e.vendor)} (${s(e.status)})`,
-  intake_call: (e) => `Web request: calling ${s(e.to)}`,
-  vendor_added: (e) => `Added service person ${s(e.vendor)}`,
-  counter: (e) => `Customer countered at ${inr(e.offer)}; asking ${s(e.vendor)}`,
-  locked: (e) => `Price locked with ${s(e.vendor)} at ${inr(e.price)} (recorded)`,
-  lock_failed: (e) => `${s(e.vendor)} did not confirm the price`,
-  note: (e) => s(e.text),
-  rated: (e) => `${s(e.vendor)} rated ${s(e.rating)}/5 (now ${s(e.average)})${e.comment ? `: "${s(e.comment)}"` : ""}`,
-  cancelled: () => "Customer cancelled by phone",
-  rescheduled: (e) => `Customer moved the job to ${s(e.when)}`,
-  change_unmatched: (e) => `A ${s(e.intent)} call didn't match any request`,
-  intake_incomplete: (e) => `Request from ${s(e.name)} missing ${s((e.missing as string[])?.join(", "))}`,
-  intake_skipped: (e) => `Request not started: ${s(e.reason)}`,
-  declined: () => "Customer didn't pick an option",
-  call: (e) => `Vaani: ${label(s(e.event))}`,
-  report: (e) => `Report ready for ${s(e.call_id)}`,
-};
-
 export default function Dashboard() {
   const [rows, setRows] = useState<Row[]>([]);
   const [agent, setAgent] = useState<Agent | null>(null);

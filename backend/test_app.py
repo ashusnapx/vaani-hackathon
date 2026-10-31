@@ -406,6 +406,15 @@ def test_process_endpoint_runs_one_finished_call(monkeypatch):
     assert c.post("/calls/nope/process", params=q).status_code == 404
 
 
+def test_a_call_sorted_placed_for_a_request_cant_start_another(monkeypatch):
+    m.TASKS.clear()
+    row = {"call_id": "vend-1", "call_status": "Completed", "post_processing_status": "completed",
+           "from_number": "+918064279097", "call_entity": {"customer_name": "Ravi", "service": "plumber", "budget": "300"}}
+    monkeypatch.setattr(m, "history", lambda page_size=50: [row])
+    monkeypatch.setitem(m.PLACED, "vend-1", {"kind": "vendor_call", "task_id": "t9"})
+    assert c.post("/calls/vend-1/process", params={"key": "k"}).status_code == 409 and not m.TASKS
+
+
 def test_a_request_remembers_the_call_that_started_it():
     m.TASKS.clear()
     m.handle({"call_id": "in-link", "call_status": "Completed", "post_processing_status": "completed",

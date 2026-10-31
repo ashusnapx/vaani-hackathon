@@ -80,7 +80,8 @@ function journey(id: string, events: Ev[], row?: Row, rows: Row[] = [], request?
     state: booked ? "done" : callback ? "live" : "waiting",
   });
   const change = [...mine].reverse().find((e) => e.type === "cancelled" || e.type === "rescheduled");
-  if (change) steps.push({ key: "change", Icon: CalendarX, title: change.type === "cancelled" ? "Cancelled" : "Rescheduled", caption: s(change.when), state: "done" });
+  const changeCall = last("change_call");
+  if (change) steps.push({ key: "change", Icon: CalendarX, title: change.type === "cancelled" ? "Cancelled" : "Rescheduled", caption: s(change.when), call: changeCall?.call_id ? String(changeCall.call_id) : undefined, state: "done" });
   steps.push({ key: "booked", Icon: CheckCircle, title: "Booked", caption: booked ? `${s(booked.vendor)} · ${priced(booked)}` : "", state: booked ? "done" : "waiting" });
   const confirm = last("confirm_call");
   const locked = last("locked");
@@ -89,7 +90,9 @@ function journey(id: string, events: Ev[], row?: Row, rows: Row[] = [], request?
     call: confirm?.call_id ? String(confirm.call_id) : undefined, state: locked ? "done" : confirm ? "live" : "waiting",
   });
   const rated = last("rated");
-  steps.push({ key: "rated", Icon: Star, title: "Rated", caption: rated ? `★ ${s(rated.rating)}/5` : "after the job", state: rated ? "done" : "waiting" });
+  const ratingCall = last("rating_call");
+  steps.push({ key: "rated", Icon: Star, title: "Rated", caption: rated ? `★ ${s(rated.rating)}/5` : ratingCall ? "asking" : "after the job",
+    call: ratingCall?.call_id ? String(ratingCall.call_id) : undefined, state: rated ? "done" : ratingCall ? "live" : "waiting" });
 
   // Anything after a cancellation is skipped; otherwise the first waiting step is the one under way.
   if (change?.type === "cancelled") for (const st of steps) if (st.state === "waiting") st.state = "skipped";
@@ -191,7 +194,8 @@ function CallAgain({ task, step, who }: { task: string; step: string; who: strin
   async function go() {
     setBusy(true);
     const t = toast.loading(`Calling ${who} again…`);
-    const r = await fetch(`/api/tasks/${encodeURIComponent(task)}/retry?step=${encodeURIComponent(step)}`, { method: "POST" }).catch(() => null);
+    const url = step === "rate" ? `/api/rate/${encodeURIComponent(task)}` : `/api/tasks/${encodeURIComponent(task)}/retry?step=${encodeURIComponent(step)}`;
+    const r = await fetch(url, { method: "POST" }).catch(() => null);
     const body = r ? await r.json().catch(() => ({})) : {};
     if (r?.ok) toast.success(`Sorted is calling ${who}`, { id: t, description: "The new call appears on this page as soon as Vaani lists it." });
     else toast.error("Couldn't place the call", { id: t, description: String(body.detail ?? "Backend unreachable.") });
@@ -200,6 +204,25 @@ function CallAgain({ task, step, who }: { task: string; step: string; who: strin
   return (
     <button onClick={go} disabled={busy} className="pill-dark mt-3 ml-3 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold disabled:opacity-50">
       <PhoneCall className="size-4" weight="fill" /> {busy ? "Calling…" : `Call ${who} again`}
+    </button>
+  );
+}
+
+/** After the job: have Sorted ring the customer for a 1–5 rating of the person they booked. */
+function AskRating({ task, who }: { task: string; who: string }) {
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    const t = toast.loading(`Asking ${who} for a rating…`);
+    const r = await fetch(`/api/rate/${encodeURIComponent(task)}`, { method: "POST" }).catch(() => null);
+    const body = r ? await r.json().catch(() => ({})) : {};
+    if (r?.ok) toast.success(`Sorted is calling ${who}`, { id: t, description: "Their 1–5 feeds the service person's rating." });
+    else toast.error("Couldn't ask for a rating", { id: t, description: String(body.detail ?? "Backend unreachable.") });
+    setBusy(false);
+  }
+  return (
+    <button onClick={go} disabled={busy} className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3.5 py-1.5 text-sm font-semibold hover:border-ink disabled:opacity-50">
+      <Star className="size-4" weight="duotone" /> {busy ? "Calling…" : `Ask ${who} for a rating`}
     </button>
   );
 }
@@ -247,7 +270,7 @@ function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: R
           <ol className="relative mt-6 space-y-8 pb-2">
             {calls.map((st, n) => {
               const r = rows.find((x) => x.call_id === st.call);
-              const person = st.key === "intake" || st.key === "callback" || st.key === "rated" ? "customer" : st.key === "locked" ? `v-${booked}` : st.key;
+              const person = st.key === "intake" || st.key === "callback" || st.key === "rated" ? "customer" : st.key === "change" ? `v-${booked}` : st.key === "locked" ? `v-${booked}` : st.key;
               const outbound = st.key !== "intake" || String(r?.direction ?? r?.call_type ?? "").toLowerCase().includes("out");
               const from = at(outbound ? "sorted" : person), to = at(outbound ? person : "sorted");
               const left = center(Math.min(from, to)), width = Math.abs(center(to) - center(from));
@@ -283,7 +306,8 @@ function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: R
                     {st.key === "callback" && <CallAgain task={String(task.task_id)} step="callback" who={s(task.name)} />}
                     {st.key.startsWith("v-") && <CallAgain task={String(task.task_id)} step={`vendor:${st.title}`} who={st.title} />}
                     {st.key === "locked" && booked && <CallAgain task={String(task.task_id)} step="confirm" who={booked} />}
-                    {r && open === st.call && <div className="mt-4 border-t border-line pt-4"><Detail r={r} /></div>}
+                    {st.key === "rated" && booked && <CallAgain task={String(task.task_id)} step="rate" who={s(task.name)} />}
+                    {r && open === st.call && <div className="mt-4 border-t border-line pt-4"><Detail r={r} startable={false} /></div>}
                   </div>
                 </li>
               );
@@ -367,6 +391,9 @@ export default function Journey({ id, request }: { id: string; request?: string 
           <h2 className="flex items-center gap-2 font-serif text-3xl"><ChatCircleDots className="size-6 text-bronze" weight="duotone" /> The journey</h2>
           <p className="mt-1 text-sm text-muted">Every call in this request. Click a step to open that call.</p>
           <div className="mt-6"><Graph steps={j.steps} current={id} /></div>
+          {j.status === "Booked" && !j.steps.find((st) => st.key === "rated")?.call && (
+            <AskRating task={String(j.task.task_id)} who={s(j.task.name)} />
+          )}
         </section>
       ) : loaded && (
         <p className="mt-10 rounded-3xl border border-line bg-surface/50 p-6 text-muted">

@@ -854,6 +854,9 @@ def process_call(call_id: str, key: str | None = Query(None)):
         raise HTTPException(status_code=404, detail="That call isn't in this agent's history")
     if row.get("post_processing_status") != "completed":
         raise HTTPException(status_code=409, detail="Vaani is still processing this call. Try again in a minute.")
+    kind = PLACED.get(call_id, {}).get("kind")
+    if kind not in (None, "intake", "intake_call"):
+        raise HTTPException(status_code=409, detail="Sorted placed this call for a request already, so there's nothing new to start from it.")
     before = len(EVENTS)
     SEEN.discard(call_id)
     handle(row)
@@ -987,11 +990,6 @@ class CallMe(BaseModel):
     phone: str
     language: str = "en"
 
-
-@app.get("/languages")
-def languages(key: str | None = Query(None)):
-    authorised(key)
-    return [{"id": k, "label": v} for k, v in LANGS.items()]
 
 
 @app.post("/actions/call-me")

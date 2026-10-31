@@ -17,6 +17,11 @@ const SAY: Record<string, (e: Ev) => [kind: "info" | "success" | "warning" | "er
     : [e.agreed ? "success" : "warning", `${s(e.vendor)} quoted ${inr(e.price)}${e.price_max ? `–${Number(e.price_max).toLocaleString("en-IN")}` : ""}`,
        e.agreed ? "Fits the budget" : e.maybe ? "Could fit the budget" : "Over the budget"],
   counter: (e) => ["info", `Counter-offer: ${inr(e.offer)}`, `Taking it to ${s(e.vendor)}`],
+  wave: (e) => ["info", "Ringing the next service person", e.lead ? `${inr(e.lead)} to beat` : undefined],
+  rating_call: (e) => ["info", `Asking ${s(e.to)} for a rating`],
+  change_call: (e) => ["info", `Telling ${s(e.to)} about a change`],
+  note: (e) => ["info", s(e.text)],
+  intake_skipped: (e) => ["warning", "A call didn't start a request", s(e.reason)],
   decision: (e) => {
     const best = e.best as Record<string, unknown> | null;
     return best ? ["success", `Best option: ${s(best.vendor)} at ${inr(best.price)}`, "Calling the customer back"] : ["warning", "Nobody could take it", "Calling the customer back with the news"];
@@ -43,7 +48,10 @@ export default function LiveToasts() {
       const e: Ev = JSON.parse(m.data);
       if (e.at < opened - 1 || seen.has(e.id) || !SAY[e.type]) return;
       seen.add(e.id);
-      const [kind, title, body] = SAY[e.type](e);
+      // a call Sorted tried to place but couldn't says so, whatever kind of call it was
+      const [kind, title, body] = e.status === "failed" || e.status === "skipped"
+        ? ["error" as const, `Couldn't call ${s(e.to)}`, s(e.reason ?? e.error)]
+        : SAY[e.type](e);
       toast[kind](title, body ? { description: body } : undefined);
     };
     return () => es.close();

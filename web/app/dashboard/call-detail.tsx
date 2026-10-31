@@ -102,7 +102,7 @@ export function FindPeople({ id }: { id: string }) {
   );
 }
 
-export function Detail({ r }: { r: Row }) {
+export function Detail({ r, startable = true }: { r: Row; startable?: boolean }) {
   const { Icon, text } = direction(r);
   // Vaani mixes 0-10 scores with nested metrics such as {all_turns, agent_turns}: bars for scores, text for the rest.
   const qualityAll = Object.entries((r.call_conversation_quality ?? {}) as Record<string, unknown>);
@@ -125,7 +125,7 @@ export function Detail({ r }: { r: Row }) {
       </div>
       <p className="mt-3 font-serif text-3xl tabular-nums">{s(r.from_number)} → {String(r.to_number ?? "").length > 20 ? "Sorted" : s(r.to_number)}</p>
       <p className="mt-1 text-sm text-muted tabular-nums">{r.call_id} · {dur(r.duration_ms)} · {inr(r.call_cost)}</p>
-      {Boolean((r.call_entity as Record<string, unknown> | null)?.service) && <div className="mt-4"><FindPeople id={r.call_id} /></div>}
+      {startable && Boolean((r.call_entity as Record<string, unknown> | null)?.service) && <div className="mt-4"><FindPeople id={r.call_id} /></div>}
 
       <Section title="Recording">
         <audio controls preload="metadata" src={`/api/recording/${encodeURIComponent(r.call_id)}`} className="h-10 w-full" />
