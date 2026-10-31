@@ -101,7 +101,7 @@ function journey(id: string, events: Ev[], row?: Row, rows: Row[] = [], request?
 
 function Graph({ steps, current }: { steps: Step[]; current: string }) {
   return (
-    <ol className="relative flex gap-0 overflow-x-auto pb-2" data-lenis-prevent>
+    <ol className="relative -my-4 flex gap-0 overflow-x-auto px-2 py-7" data-lenis-prevent>
       {steps.map((st, i) => {
         const tone = st.state === "done" ? "bg-ink text-paper border-ink" : st.state === "live" ? "bg-bronze text-paper border-bronze" : "bg-paper text-muted border-line-strong";
         const node = (
