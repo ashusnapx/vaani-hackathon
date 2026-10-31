@@ -4,6 +4,7 @@ import { GaugeIcon as Gauge, HouseIcon as House, PhoneIcon as Phone, UsersThreeI
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 
 const number = process.env.NEXT_PUBLIC_SORTED_NUMBER || "+91 80642 79097";
 
@@ -15,8 +16,6 @@ const PAGES = [
 
 /** One header for every page, in the root layout, so it never shifts between pages. Request and call pages light up Dashboard. */
 export default function SiteNav() {
-  const path = usePathname();
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   return (
     <header className="mx-auto flex max-w-[96rem] items-center justify-between gap-3 border-b border-line px-4 py-4 sm:px-8">
       <div className="flex items-center gap-2">
@@ -28,15 +27,10 @@ export default function SiteNav() {
         </a>
       </div>
       <div className="flex items-center gap-2">
-        <nav aria-label="Pages" className="flex items-center gap-1 rounded-full border border-line bg-surface/70 p-1">
-          {PAGES.map(({ href, label, Icon }) => (
-            <Link key={href} href={href} aria-label={label} aria-current={active(href) ? "page" : undefined}
-              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm transition sm:px-3.5 ${active(href) ? "pill-dark font-semibold" : "text-muted hover:bg-paper hover:text-ink"}`}>
-              <Icon className="size-4" weight={active(href) ? "fill" : "regular"} aria-hidden />
-              <span className="hidden sm:inline">{label}</span>
-            </Link>
-          ))}
-        </nav>
+        {/* the path is URL data on request and call pages, so it streams in; until then no pill is lit */}
+        <Suspense fallback={<Pills />}>
+          <ActivePills />
+        </Suspense>
         <a href={`tel:${number.replace(/\s/g, "")}`} aria-label={`Call Sorted on ${number}`}
           className="flex items-center gap-2 rounded-full border border-line-strong bg-paper px-3 py-2 text-sm font-semibold tabular-nums transition hover:border-ink lg:px-4">
           <Phone className="size-4" weight="fill" aria-hidden />
@@ -44,5 +38,24 @@ export default function SiteNav() {
         </a>
       </div>
     </header>
+  );
+}
+
+function ActivePills() {
+  return <Pills path={usePathname()} />;
+}
+
+function Pills({ path }: { path?: string }) {
+  const active = (href: string) => !!path && (href === "/" ? path === "/" : path.startsWith(href));
+  return (
+    <nav aria-label="Pages" className="flex items-center gap-1 rounded-full border border-line bg-surface/70 p-1">
+      {PAGES.map(({ href, label, Icon }) => (
+        <Link key={href} href={href} aria-label={label} aria-current={active(href) ? "page" : undefined}
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm transition sm:px-3.5 ${active(href) ? "pill-dark font-semibold" : "text-muted hover:bg-paper hover:text-ink"}`}>
+          <Icon className="size-4" weight={active(href) ? "fill" : "regular"} aria-hidden />
+          <span className="hidden sm:inline">{label}</span>
+        </Link>
+      ))}
+    </nav>
   );
 }
