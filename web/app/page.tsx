@@ -1,7 +1,6 @@
 import { ReactLenis } from "lenis/react";
-import { GaugeIcon as Gauge, HandCoinsIcon as HandCoins, PhoneIcon as Phone, PhoneIncomingIcon as PhoneIncoming, PhoneOutgoingIcon as PhoneOutgoing, UsersThreeIcon as UsersThree } from "@phosphor-icons/react/dist/ssr";
+import { HandCoinsIcon as HandCoins, PhoneIncomingIcon as PhoneIncoming, PhoneOutgoingIcon as PhoneOutgoing } from "@phosphor-icons/react/dist/ssr";
 import Image from "next/image";
-import Link from "next/link";
 import BeforeAfter from "./before-after";
 import CallMe from "./call-me";
 import Features from "./features";
@@ -10,7 +9,6 @@ import Services from "./services";
 import { PencilRing } from "./sketch";
 import { RING } from "./sketch-art";
 
-const number = process.env.NEXT_PUBLIC_SORTED_NUMBER || "+91 80642 79097";
 
 const SOURCES = [
   ["HDFC Sky, Urban Company RHP key details", "https://hdfcsky.com/news/urban-company-ipo-opens-on-september-10-key-details-and-risks-from-rhp"],
@@ -41,28 +39,7 @@ export default function Home() {
   return (
     <ReactLenis root>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <div className="mx-auto max-w-[88rem] px-4 sm:px-8">
-        <header className="flex items-center justify-between gap-4 border-b border-line py-5">
-          <p className="flex items-center gap-2">
-            <span className="font-serif text-3xl italic">Sorted</span>
-            <a href="https://www.vaani.dev" target="_blank" rel="noreferrer"
-              className="hidden items-center gap-1.5 rounded-full border border-line py-0.5 pr-2.5 pl-1 text-sm text-muted transition hover:border-ink sm:flex">
-              <Image src="/vaani-logo.png" alt="" width={20} height={18} />
-              on Vaani
-            </a>
-          </p>
-          <div className="flex items-center gap-5">
-            <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-muted hover:text-ink">
-              <Gauge className="size-4" aria-hidden /> Dashboard
-            </Link>
-            <Link href="/service-people" className="hidden items-center gap-1.5 text-sm text-muted hover:text-ink sm:flex">
-              <UsersThree className="size-4" aria-hidden /> Service people
-            </Link>
-            <a href={`tel:${number.replace(/\s/g, "")}`} className="pill-dark flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold tabular-nums">
-              <Phone className="size-4" weight="fill" aria-hidden /> Call {number}
-            </a>
-          </div>
-        </header>
+      <div className="mx-auto max-w-[96rem] px-4 sm:px-8">
 
         <section className="grid items-center gap-12 py-14 lg:grid-cols-[1.05fr_1fr] lg:py-20">
           <div>

@@ -4,6 +4,7 @@ import { CheckCircleIcon as CheckCircle, InfoIcon as Info, SpinnerGapIcon as Spi
 import { Toaster } from "sonner";
 import "./globals.css";
 import LiveToasts from "./live-toasts";
+import SiteNav from "./site-nav";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 const kalam = Kalam({ variable: "--font-kalam", subsets: ["latin"], weight: "400" });
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${manrope.variable} ${archivo.variable} ${instrument.variable} ${kalam.variable} h-full antialiased`}
     >
       <body className="min-h-full font-sans">
+        <SiteNav />
         {children}
         <LiveToasts />
         <Toaster
