@@ -128,7 +128,7 @@ export function Detail({ r }: { r: Row }) {
       {Boolean((r.call_entity as Record<string, unknown> | null)?.service) && <div className="mt-4"><FindPeople id={r.call_id} /></div>}
 
       <Section title="Recording">
-        <audio controls preload="none" src={`/api/recording/${encodeURIComponent(r.call_id)}`} className="h-10 w-full" />
+        <audio controls preload="metadata" src={`/api/recording/${encodeURIComponent(r.call_id)}`} className="h-10 w-full" />
       </Section>
 
       <Section title="Summary">
