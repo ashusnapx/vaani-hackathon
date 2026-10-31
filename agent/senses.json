@@ -1,0 +1,197 @@
+{
+ "language": "hi",
+ "accent": null,
+ "tts_accent": null,
+ "auto_detect": true,
+ "ears": {
+  "stt": {
+   "primary": {
+    "provider": "deepgram",
+    "model": "nova-3",
+    "language": "hi",
+    "keywords": [
+     "upi",
+     "gpay",
+     "google pay",
+     "phonepe",
+     "paytm",
+     "bhim",
+     "scan",
+     "collect request",
+     "paisa",
+     "transfer",
+     "card",
+     "debit",
+     "credit",
+     "cvv",
+     "atm",
+     "swipe",
+     "card block",
+     "net banking",
+     "netbanking",
+     "internet banking",
+     "beneficiary",
+     "neft",
+     "imps",
+     "rtgs",
+     "wallet",
+     "amazon pay",
+     "mobikwik",
+     "freecharge",
+     "otp",
+     "kyc",
+     "verification code",
+     "bank called",
+     "customer care",
+     "update kyc",
+     "account blocked",
+     "aadhaar link",
+     "investment",
+     "trading",
+     "stock",
+     "profit",
+     "returns",
+     "telegram group",
+     "whatsapp group",
+     "task",
+     "crypto invest",
+     "ordered",
+     "delivery",
+     "product",
+     "never arrived",
+     "fake website",
+     "shopping",
+     "refund",
+     "courier",
+     "loan app",
+     "instant loan",
+     "recovery agent",
+     "morphed",
+     "contacts",
+     "threatening",
+     "blackmail loan",
+     "crypto",
+     "bitcoin",
+     "usdt",
+     "binance",
+     "wallet address",
+     "trust wallet",
+     "insurance",
+     "policy",
+     "lapsed",
+     "bonus",
+     "irda",
+     "maturity",
+     "digital arrest",
+     "cbi",
+     "narcotics",
+     "parcel",
+     "customs",
+     "supreme court",
+     "money laundering",
+     "skype",
+     "uniform",
+     "warrant",
+     "trai",
+     "income tax",
+     "gst officer",
+     "ed officer",
+     "aadhaar officer",
+     "sextortion",
+     "nude",
+     "video call",
+     "recording",
+     "blackmail",
+     "obscene",
+     "leak",
+     "screen recording",
+     "child",
+     "minor",
+     "csam",
+     "underage",
+     "stalking",
+     "doorman",
+     "code word",
+     "grandson",
+     "pota",
+     "nani",
+     "dadi",
+     "accident",
+     "hospital",
+     "arrest",
+     "police",
+     "pension",
+     "life certificate",
+     "electricity",
+     "bijli",
+     "lottery",
+     "KBC",
+     "anydesk",
+     "teamviewer"
+    ],
+    "config": {}
+   },
+   "fallback": {
+    "provider": "sarvam",
+    "model": "saaras:v3",
+    "config": {
+     "end_of_turn_confidence_threshold": 0.5,
+     "min_end_of_turn_silence_when_confident": 160,
+     "max_turn_silence": 1280,
+     "format_turns": true
+    }
+   }
+  }
+ },
+ "brain": {
+  "llm": {
+   "primary": {
+    "provider": "google",
+    "model": "gemini-3.5-flash",
+    "parameters": {
+     "temperature": 0.3,
+     "top_p": 1.0,
+     "max_tokens": 500
+    }
+   },
+   "fallback": {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "parameters": {
+     "temperature": 0.3,
+     "top_p": 1.0,
+     "max_tokens": 500
+    }
+   },
+   "auto_detect": false
+  }
+ },
+ "mouth": {
+  "tts": {
+   "primary": {
+    "provider": "cartesia",
+    "model": "sonic-3-2025-10-27",
+    "voice_id": "9cebb910-d4b7-4a4a-85a4-12c79137724c",
+    "voice_name": "devansh",
+    "is_cloned": false,
+    "config": {
+     "speed": 1,
+     "language": "hi",
+     "emotion": [],
+     "emotions": []
+    }
+   },
+   "fallback": {
+    "provider": "sarvam",
+    "model": "bulbul:v3",
+    "voice_id": "aayan",
+    "is_cloned": false,
+    "config": {
+     "language": "hi"
+    },
+    "voice_name": "aayan"
+   },
+   "word_pronunciation_pairs": {}
+  }
+ }
+}
