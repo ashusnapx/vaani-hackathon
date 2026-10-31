@@ -5,10 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Ev = { id: number; type: string; at: number } & Record<string, unknown>;
 type Call = Record<string, unknown> & { call_id: string };
-type Offer = { vendor: string; price: number; eta: string; notes?: string } | null;
+type Offer = { vendor: string; price: number; price_max?: number; open?: boolean; eta: string; notes?: string } | null;
 
 const s = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : String(v));
 const inr = (v: unknown) => `₹${Number(v).toLocaleString("en-IN")}`;
+// A quote as said: "₹800", "₹800–1,000", or "₹300+" when the rest depends on inspection.
+const priced = (q: Record<string, unknown> | null | undefined) =>
+  !q ? "—" : `${inr(q.price)}${q.price_max ? `–${Number(q.price_max).toLocaleString("en-IN")}` : ""}${q.open ? "+" : ""}`;
 const clock = (at: number) => new Date(at * 1000).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 const reduced = () => typeof window !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -78,7 +81,7 @@ function Lane({ name, call, quote, booked, rank }: { name: string; call?: Ev; qu
         {quote ? (
           price ? (
             <>
-              <p ref={priceRef} className="font-serif text-5xl tabular-nums">{inr(price)}</p>
+              <p ref={priceRef} className="font-serif text-5xl tabular-nums">{priced(quote)}</p>
               <div className="text-sm">
                 <p>{s(quote.eta)}</p>
                 {quote.notes ? <p className="text-muted">{s(quote.notes)}</p> : null}
@@ -93,7 +96,9 @@ function Lane({ name, call, quote, booked, rank }: { name: string; call?: Ev; qu
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {quote && price ? (
-          quote.agreed ? <Stamp label="Agreed" tone="text-safe" on={quote} /> : <Stamp label="Over budget" tone="text-pending" on={quote} />
+          quote.agreed ? <Stamp label="Fits budget" tone="text-safe" on={quote} />
+            : quote.maybe ? <Stamp label="Could fit" tone="text-pending" on={quote} />
+            : <Stamp label="Over budget" tone="text-scam" on={quote} />
         ) : null}
         {rank && <Stamp label={rank} tone="text-family" on={rank} />}
         {booked && <Stamp label="Booked" tone="text-safe" on={booked} />}
@@ -153,12 +158,14 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
         <div className="mt-6 rounded-2xl border border-line bg-surface/70 p-5">
           <p className="font-semibold">
             {booked
-              ? `Booked with ${s(booked.vendor)} for ${inr(booked.price)}, ${s(booked.eta)}.`
+              ? `Booked with ${s(booked.vendor)} for ${priced(booked)}, ${s(booked.eta)}.`
               : decision.mode === "agreed"
-                ? `${best?.vendor} agreed at ${inr(best?.price)}${backup ? `; ${backup.vendor} is the backup at ${inr(backup.price)}` : ""}. Calling ${s(task.name)} back.`
-                : decision.mode === "over_budget"
-                  ? `Nobody met ${inr(task.budget)}. Closest: ${best?.vendor} at ${inr(best?.price)}. Asking ${s(task.name)}.`
-                  : `No one could take it. Calling ${s(task.name)} back with the news.`}
+                ? `${best?.vendor} fits at ${priced(best)}${backup ? `; ${backup.vendor} is the backup at ${priced(backup)}` : ""}. Calling ${s(task.name)} back.`
+                : decision.mode === "maybe"
+                  ? `No firm price within ${inr(task.budget)}, but ${best?.vendor} at ${priced(best)} could fit. Asking ${s(task.name)}.`
+                  : decision.mode === "over_budget"
+                    ? `Nobody came within ${inr(task.budget)}. Closest: ${best?.vendor} at ${priced(best)}. Asking ${s(task.name)}.`
+                    : `No one could take it. Calling ${s(task.name)} back with the news.`}
           </p>
           {callback?.live_captions_url && !booked ? <Captions url={String(callback.live_captions_url)} who={s(task.name)} /> : null}
           {booked && (

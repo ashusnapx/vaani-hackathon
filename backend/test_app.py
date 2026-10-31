@@ -113,7 +113,7 @@ def test_finished_calls_drive_the_flow():
     m.TASKS[t]["in_wave"] = ["A"]
     m.PLACED["v-1"] = {"kind": "vendor_call", "task_id": t, "vendor": "A"}
     m.handle({"call_id": "v-1", "call_status": "Completed", "post_processing_status": "completed",
-              "call_entity": {"can_do_job": "yes", "price_quoted": "750", "eta": "tomorrow"}})
+              "call_entity": {"can_do_job": "yes", "price_min": "750", "pricing_basis": "fixed", "eta": "tomorrow"}})
     assert m.TASKS[t]["quotes"]["A"]["agreed"]
     m.PLACED["cb-1"] = {"kind": "callback", "task_id": t}
     m.handle({"call_id": "cb-1", "call_status": "Completed", "post_processing_status": "completed",
@@ -159,3 +159,52 @@ def test_vendors_added_and_removed_from_the_dashboard():
     assert "99999" not in str(listed)  # numbers never leave the server in full
     assert c.delete("/vendors/ravi", params=q).json()["ok"]
     assert c.delete("/vendors/ravi", params=q).status_code == 404
+
+
+def test_amounts_as_people_say_them():
+    assert m.amounts("eight hundred is 800") == [800]
+    assert m.amounts("1,200") == [1200] and m.amounts("1.5k") == [1500]
+    assert m.amounts("2 thousand to 2.5 thousand") == [2000, 2500]
+    assert m.amounts("1 lakh") == [100000] and m.amounts("₹800-1000") == [800, 1000]
+    assert m.rupees("between 800 and 1000") == 1000  # a budget range is a ceiling
+
+
+def test_ranges_fit_only_when_their_top_does():
+    t = task(budget="1000")["task_id"]
+    m.quote_in(t, "A", "800", "1000", basis="range")
+    m.quote_in(t, "B", "700", "1300", basis="range")
+    a, b = m.TASKS[t]["quotes"]["A"], m.TASKS[t]["quotes"]["B"]
+    assert a["agreed"] and not b["agreed"] and b["maybe"]
+    assert m.decide(m.TASKS[t])["best"]["vendor"] == "A"
+
+
+def test_open_ended_quotes_are_never_counted_as_fitting():
+    t = task(budget="800")["task_id"]
+    m.quote_in(t, "A", "300", basis="after_inspection")
+    q = m.TASKS[t]["quotes"]["A"]
+    assert q["open"] and not q["agreed"] and q["maybe"]
+    assert m.decide(m.TASKS[t])["mode"] == "maybe"
+    assert "after inspection" in m.price_text(q)
+
+
+def test_a_firm_fit_beats_a_cheaper_maybe():
+    t = task(budget="1000")["task_id"]
+    m.quote_in(t, "A", "500", "1500", basis="range")
+    m.quote_in(t, "B", "950")
+    d = m.decide(m.TASKS[t])
+    assert d["mode"] == "agreed" and d["best"]["vendor"] == "B"
+
+
+def test_vendor_never_hears_the_budget():
+    calls, real = [], m.dispatch
+    m.dispatch = lambda kind, name, phone, prompt, greeting, tag, analysis=None: calls.append(prompt + greeting) or None
+    try:
+        m.TASKS.clear()
+        m.start_task({"name": "Priya", "phone": "9876543210", "service": "AC repair", "details": "AC not cooling",
+                      "budget": "8765", "area": "Koramangala", "when": "tomorrow 10 am"})
+        m.ring_next(next(iter(m.TASKS)))
+    finally:
+        m.dispatch = real
+    spoken_to_vendor = calls[0]
+    assert "8765" not in spoken_to_vendor
+    assert "AC not cooling" in spoken_to_vendor and "Koramangala" in spoken_to_vendor and "tomorrow 10 am" in spoken_to_vendor

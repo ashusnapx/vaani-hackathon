@@ -185,7 +185,8 @@ function Detail({ r }: { r: Row }) {
 const EVENT_TEXT: Record<string, (e: Ev) => string> = {
   task: (e) => `${s(e.name)} asked for ${s(e.service)} in ${s(e.area)}, budget ${inr(e.budget)}`,
   vendor_call: (e) => `Calling ${s(e.vendor)} (${s(e.status)})`,
-  quote: (e) => `${s(e.vendor)} quoted ${inr(e.price)}${e.agreed ? ", within budget" : e.price ? ", over budget" : `: ${s(e.notes)}`}`,
+  quote: (e) => !e.price ? `${s(e.vendor)}: ${s(e.notes)}`
+    : `${s(e.vendor)} quoted ${inr(e.price)}${e.price_max ? `–${Number(e.price_max).toLocaleString("en-IN")}` : ""}${e.open ? "+" : ""} (${s(e.basis)}), ${e.agreed ? "fits budget" : e.maybe ? "could fit" : "over budget"}`,
   wave: (e) => s(e.note),
   decision: (e) => `Decision: ${s(e.mode)}${e.best ? `, best ${s((e.best as Record<string, unknown>).vendor)}` : ""}`,
   callback: (e) => `Calling ${s(e.to)} back (${s(e.status)})`,
