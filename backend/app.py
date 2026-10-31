@@ -299,8 +299,10 @@ def dispatch(kind: str, to_name: str, to_phone: str, prompt: str, greeting: str,
         modify["persona"]["senses_capabilities"] = senses
         modify["persona"]["identity"]["system_prompt"] += (
             f" Speak {LANGS[lang]} throughout this call, in simple everyday words; switch only if they do.")
-    else:
-        modify["persona"]["identity"]["system_prompt"] += " Speak English."
+    else:  # no language chosen: open in English, then follow theirs
+        modify["persona"]["identity"]["system_prompt"] += (
+            " Open in English. From their first reply, notice which language they speak and use that language "
+            "for the rest of the call. If they switch, switch with them.")
     body = {
         "agent_id": AGENT_ID, "medium": "telephony", "name": clean(to_name, 60),
         "contact_number": to_phone, "outbound_number": SORTED_NUMBER,
@@ -734,7 +736,10 @@ def handle(row: dict) -> bool:
             change_request(phone, intent, e.get("new_time"))
             return True
         # A website caller gave their name in the form, so the call never asked for it.
-        res = start_task({"call_id": call_id, "language": placed.get("language", "en"),
+        # The language they chose on the website, or else the one Vaani heard them speak.
+        heard = str(e.get("language_spoken") or "").lower()
+        chosen = placed.get("language") if placed.get("language") not in (None, "", "en") else None
+        res = start_task({"call_id": call_id, "language": chosen or (heard if heard in LANGS else "en"),
                           "name": e.get("customer_name") or placed.get("name"), "phone": phone, "address": e.get("address"),
                           "area": e.get("area"), "service": e.get("service"), "details": e.get("details"),
                           "when": e.get("when"), "budget": e.get("budget"), "category": e.get("category")})

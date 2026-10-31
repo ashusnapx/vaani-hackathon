@@ -2,13 +2,18 @@
  "language": "en",
  "accent": null,
  "tts_accent": null,
- "auto_detect": false,
+ "auto_detect": true,
  "ears": {
   "stt": {
    "primary": {
+    "provider": "sarvam",
+    "model": "saaras:v3",
+    "config": {}
+   },
+   "fallback": {
     "provider": "deepgram",
     "model": "nova-3",
-    "language": "en",
+    "language": "multi",
     "keywords": [
      "upi",
      "gpay",
@@ -141,16 +146,6 @@
      "rupees"
     ],
     "config": {}
-   },
-   "fallback": {
-    "provider": "sarvam",
-    "model": "saaras:v3",
-    "config": {
-     "end_of_turn_confidence_threshold": 0.5,
-     "min_end_of_turn_silence_when_confident": 160,
-     "max_turn_silence": 1280,
-     "format_turns": true
-    }
    }
   }
  },
@@ -180,6 +175,16 @@
  "mouth": {
   "tts": {
    "primary": {
+    "provider": "sarvam",
+    "model": "bulbul:v3",
+    "voice_id": "aayan",
+    "voice_name": "aayan",
+    "is_cloned": false,
+    "config": {
+     "language": "en"
+    }
+   },
+   "fallback": {
     "provider": "cartesia",
     "model": "sonic-3-2025-10-27",
     "voice_id": "9cebb910-d4b7-4a4a-85a4-12c79137724c",
@@ -191,16 +196,6 @@
      "emotion": [],
      "emotions": []
     }
-   },
-   "fallback": {
-    "provider": "sarvam",
-    "model": "bulbul:v3",
-    "voice_id": "aayan",
-    "is_cloned": false,
-    "config": {
-     "language": "en-IN"
-    },
-    "voice_name": "aayan"
    },
    "word_pronunciation_pairs": {}
   }

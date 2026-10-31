@@ -446,3 +446,10 @@ def test_dates_are_said_the_way_people_say_them():
 def test_every_language_has_its_greetings():
     assert set(m.CALL_ME_GREETING) == set(m.LANGS) == set(m.CALLBACK_GREETING)
     assert all("Sorted" in g for g in list(m.CALL_ME_GREETING.values()) + list(m.CALLBACK_GREETING.values()))
+
+
+def test_callback_uses_the_language_the_caller_spoke():
+    m.TASKS.clear()
+    m.handle({"call_id": "in-ta", "call_status": "Completed", "post_processing_status": "completed", "from_number": "+919876543210",
+              "call_entity": {"customer_name": "Kavya", "service": "AC repair", "budget": "900", "language_spoken": "ta"}})
+    assert next(iter(m.TASKS.values()))["language"] == "ta"
