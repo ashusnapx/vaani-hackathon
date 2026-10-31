@@ -421,3 +421,15 @@ def test_vendor_price_filed_under_budget_is_still_their_price():
     m.handle({"call_id": "v-b", "call_status": "Completed", "post_processing_status": "completed",
               "call_entity": {"customer_name": "A", "budget": 300, "request_confirmed": True}})
     assert m.TASKS[t]["quotes"]["A"]["price"] == 300 and m.TASKS[t]["quotes"]["A"]["agreed"]
+
+
+def test_call_cache_version_moves_only_when_a_call_changes(monkeypatch):
+    data = [{"call_id": "a", "call_status": "Ringing", "post_processing_status": None, "duration_ms": 0}]
+    monkeypatch.setattr(m, "history", lambda page_size=50: [dict(r) for r in data])
+    m.refresh_calls()
+    v = m.CALLS_CACHE["version"]
+    m.refresh_calls()
+    assert m.CALLS_CACHE["version"] == v  # nothing changed, no signal
+    data[0]["call_status"] = "Completed"
+    m.refresh_calls()
+    assert m.CALLS_CACHE["version"] == v + 1

@@ -100,7 +100,9 @@ EVENTS: list[dict] = []
 TASKS: dict[str, dict] = {}
 PLACED: dict[str, dict] = {}  # call_id we dialled -> {"kind", "task_id", "vendor"}
 SEEN: set[str] = set()
-LAST_CAPTIONS: dict[str, str | None] = {}  # call_id -> signed live captions URL, for the page that asked
+LAST_CAPTIONS: dict[str, str | None] = {}
+# The poller's latest copy of Vaani's call history, so pages read it instantly and only refetch on change.
+CALLS_CACHE: dict = {"rows": [], "at": 0.0, "version": 0, "sig": ""}  # call_id -> signed live captions URL, for the page that asked
 LOCK = threading.Lock()
 
 # Requests, the calls we placed and the calls we've handled survive a restart (gitignored file).
@@ -734,6 +736,16 @@ def history(page_size: int = 50) -> list[dict]:
     return [row for row in rows if row.get("agent_id") == AGENT_ID]
 
 
+def refresh_calls() -> list[dict]:
+    """Fetch the history once and bump the version only if any call changed, so pages refetch only then."""
+    rows = history(200)
+    sig = "|".join(f"{r.get('call_id')}:{r.get('call_status')}:{r.get('post_processing_status')}:{r.get('duration_ms')}" for r in rows)
+    if sig != CALLS_CACHE["sig"]:
+        CALLS_CACHE.update(sig=sig, version=CALLS_CACHE["version"] + 1)
+    CALLS_CACHE.update(rows=rows, at=time.time())
+    return rows
+
+
 def poll_forever() -> None:
     if not SEEN:  # first run ever: calls from before Sorted existed are history
         try:
@@ -744,7 +756,7 @@ def poll_forever() -> None:
     while True:
         time.sleep(POLL_SECONDS)
         try:
-            for row in reversed(history()):
+            for row in reversed(refresh_calls()[:50]):
                 if row["call_id"] not in SEEN and handle(row):
                     SEEN.add(row["call_id"])
                     save_state()
@@ -1004,10 +1016,14 @@ async def events(key: str | None = Query(None), after: int = 0, full: bool = Fal
 
     async def stream():
         sent = 0 if full else max(after, len(EVENTS) - 80)
+        calls_seen = CALLS_CACHE["version"]
         while True:
             while sent < len(EVENTS):
                 yield f"data: {json.dumps(EVENTS[sent], ensure_ascii=False)}\n\n"
                 sent += 1
+            if CALLS_CACHE["version"] != calls_seen:  # a call changed in Vaani: tell pages to refetch
+                calls_seen = CALLS_CACHE["version"]
+                yield f"event: calls\ndata: {calls_seen}\n\n"
             yield ": ping\n\n"
             await asyncio.sleep(0.5)
 
@@ -1020,7 +1036,8 @@ def calls(key: str | None = Query(None), full: bool = False):
     authorised(key)
     if not VAANI_API_KEY:
         return []
-    rows = history(200)
+    # The poller keeps this warm; only go to Vaani if it's stale (poller off or just started).
+    rows = CALLS_CACHE["rows"] if time.time() - CALLS_CACHE["at"] < POLL_SECONDS * 3 else refresh_calls()
     if full:
         return rows
     keep = ("call_id", "Start_time", "duration_ms", "call_status", "call_type", "from_number",
