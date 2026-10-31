@@ -104,7 +104,10 @@ export function FindPeople({ id }: { id: string }) {
 
 export function Detail({ r }: { r: Row }) {
   const { Icon, text } = direction(r);
-  const quality = (r.call_conversation_quality ?? {}) as Record<string, number>;
+  // Vaani mixes 0-10 scores with nested metrics such as {all_turns, agent_turns}: bars for scores, text for the rest.
+  const qualityAll = Object.entries((r.call_conversation_quality ?? {}) as Record<string, unknown>);
+  const quality = Object.fromEntries(qualityAll.filter(([, v]) => typeof v === "number")) as Record<string, number>;
+  const qualityOther = qualityAll.filter(([, v]) => v !== null && typeof v === "object");
   const billing = (r.billing_breakdown ?? {}) as { line_items?: Record<string, unknown>[] } & Record<string, unknown>;
   const timeline = [
     ["Dialing", r.call_dialing_at], ["Ringing", r.call_ringing_at], ["Picked up", r.user_picked_up_at],
@@ -141,12 +144,20 @@ export function Detail({ r }: { r: Row }) {
           <KV data={r.call_eval_tag} />
         </Section>
         <Section title="Conversation quality">
-          {Object.keys(quality).length ? (
+          {Object.keys(quality).length || qualityOther.length ? (
             <ul className="space-y-2 text-sm">
               {Object.entries(quality).map(([k, v]) => (
                 <li key={k}>
                   <div className="flex justify-between"><span className="text-muted">{label(k)}</span><span className="tabular-nums">{v}/10</span></div>
-                  <div className="mt-1 h-1.5 rounded-full bg-surface-2"><div className="h-full rounded-full bg-bronze" style={{ width: `${Number(v) * 10}%` }} /></div>
+                  <div className="mt-1 h-1.5 rounded-full bg-surface-2"><div className="h-full rounded-full bg-bronze" style={{ width: `${Math.min(100, Number(v) * 10)}%` }} /></div>
+                </li>
+              ))}
+              {qualityOther.map(([k, v]) => (
+                <li key={k} className="flex justify-between gap-4">
+                  <span className="text-muted">{label(k)}</span>
+                  <span className="text-right tabular-nums">
+                    {Object.entries(v as Record<string, unknown>).map(([kk, vv]) => `${label(kk)} ${typeof vv === "number" ? Math.round(vv * 100) / 100 : s(vv)}`).join(" · ")}
+                  </span>
                 </li>
               ))}
             </ul>
