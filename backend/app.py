@@ -29,9 +29,16 @@ WAVE_TIMEOUT = int(os.getenv("WAVE_TIMEOUT", "300"))
 WAVE_SIZE = int(os.getenv("WAVE_SIZE", "1"))
 ENOUGH_AGREED = 2  # a best option and a backup
 MAX_OPEN_TASKS = int(os.getenv("MAX_OPEN_TASKS", "5"))  # a prank caller can't make us ring everyone
-# [{"name": "Sharma Cooling", "phone": "+9198...", "services": ["ac"]}]; "*" or no list = any job.
-# Real numbers stay in env, never in this public repo.
-VENDORS = json.loads(os.getenv("VENDORS", "[]"))
+# [{"name": "Shashank", "phone": "+9196...", "services": ["*"]}]; "*" or no list = any job.
+# Real numbers live in vendors.json (gitignored), never in this public repo; the dashboard edits it.
+VENDORS_FILE = os.path.join(os.path.dirname(__file__), "vendors.json")
+VENDORS = (json.load(open(VENDORS_FILE)) if os.path.exists(VENDORS_FILE)
+           else json.loads(os.getenv("VENDORS", "[]")))
+
+
+def save_vendors() -> None:
+    with open(VENDORS_FILE, "w") as f:
+        json.dump(VENDORS, f, indent=1)
 
 
 def _root_env(key: str) -> str:
@@ -572,6 +579,46 @@ def call_me(body: CallMe, key: str | None = Query(None)):
     greeting = f"Hi {name}, this is Sorted. You asked us to call you. What can I get done for you today?"
     dispatch("intake_call", name, phone, prompt, greeting, {"phone": phone})
     return {"ok": True}
+
+
+class VendorIn(BaseModel):
+    name: str
+    phone: str
+    services: list[str] = ["*"]
+
+
+@app.get("/vendors")
+def list_vendors(key: str | None = Query(None)):
+    authorised(key)
+    return [{"name": v["name"], "phone_tail": digits(v["phone"])[-4:], "services": v.get("services") or ["*"]}
+            for v in VENDORS]
+
+
+@app.post("/vendors")
+def add_vendor(body: VendorIn, key: str | None = Query(None)):
+    authorised(key)
+    name = clean(body.name, 40)
+    if not name:
+        raise HTTPException(status_code=422, detail="Give the service person a name")
+    if len(digits(body.phone)) != 10:
+        raise HTTPException(status_code=422, detail="Enter a 10-digit Indian mobile number")
+    services = [clean(x, 30).lower() for x in body.services if clean(x, 30)] or ["*"]
+    VENDORS[:] = [v for v in VENDORS if v["name"].lower() != name.lower()]
+    VENDORS.append({"name": name, "phone": "+91" + digits(body.phone), "services": services})
+    save_vendors()
+    publish("vendor_added", vendor=name, services=services)
+    return {"ok": True, "count": len(VENDORS)}
+
+
+@app.delete("/vendors/{name}")
+def remove_vendor(name: str, key: str | None = Query(None)):
+    authorised(key)
+    before = len(VENDORS)
+    VENDORS[:] = [v for v in VENDORS if v["name"].lower() != name.lower()]
+    if len(VENDORS) == before:
+        raise HTTPException(status_code=404, detail="No such service person")
+    save_vendors()
+    return {"ok": True, "count": len(VENDORS)}
 
 
 @app.get("/events")

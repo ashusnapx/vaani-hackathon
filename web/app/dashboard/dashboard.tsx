@@ -2,6 +2,7 @@
 
 import { ArrowDownLeft, ArrowUpRight, Globe, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Vendors from "./vendors";
 
 type Row = Record<string, unknown> & { call_id: string };
 type Ev = { id: number; type: string; at: number } & Record<string, unknown>;
@@ -191,6 +192,10 @@ const EVENT_TEXT: Record<string, (e: Ev) => string> = {
   booked: (e) => `Booked ${s(e.vendor)} at ${inr(e.price)}, ${s(e.eta)}`,
   confirm_call: (e) => `Confirming with ${s(e.vendor)} (${s(e.status)})`,
   intake_call: (e) => `Web request: calling ${s(e.to)}`,
+  vendor_added: (e) => `Added service person ${s(e.vendor)}`,
+  intake_incomplete: (e) => `Request from ${s(e.name)} missing ${s((e.missing as string[])?.join(", "))}`,
+  intake_skipped: (e) => `Request not started: ${s(e.reason)}`,
+  declined: () => "Customer didn't pick an option",
   call: (e) => `Vaani: ${label(s(e.event))}`,
   report: (e) => `Report ready for ${s(e.call_id)}`,
 };
@@ -304,6 +309,8 @@ export default function Dashboard() {
               })}
             </ul>
           )}
+
+          <div className="mt-12"><Vendors /></div>
 
           <h2 className="mt-12 font-serif text-3xl">Live activity</h2>
           <ol className="mt-3 max-h-96 space-y-1.5 overflow-y-auto text-sm" data-lenis-prevent>

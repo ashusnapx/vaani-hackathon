@@ -5,3 +5,4 @@ docs/vaani/*
 !docs/vaani/sync.sh
 __pycache__/
 *.local.md
+backend/vendors.json

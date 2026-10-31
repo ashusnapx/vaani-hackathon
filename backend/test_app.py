@@ -15,6 +15,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 import app as m  # noqa: E402
 
 m.VAANI_API_KEY = ""
+m.VENDORS[:] = json.loads(os.environ["VENDORS"])  # never the real vendors.json
+m.save_vendors = lambda: None
 m.later = lambda *a, **k: None  # no timers or real calls in tests
 c = TestClient(m.app)
 
@@ -146,3 +148,14 @@ def test_tool_path_and_poller_path_do_not_double_up():
     assert len(m.TASKS) == 1
     assert c.post("/tools/create-task", json={**body, "phone": ""}, headers=H).json()["ok"]
     assert c.post("/tools/book-vendor", json={"task_id": "nope", "vendor": "A"}, headers=H).json()["ok"] is False
+
+
+def test_vendors_added_and_removed_from_the_dashboard():
+    q = {"key": "k"}
+    assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "12345"}).status_code == 422
+    assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "+91 99999 88888", "services": ["Plumber"]}).json()["ok"]
+    listed = c.get("/vendors", params=q).json()
+    assert {"name": "Ravi", "phone_tail": "8888", "services": ["plumber"]} in listed
+    assert "99999" not in str(listed)  # numbers never leave the server in full
+    assert c.delete("/vendors/ravi", params=q).json()["ok"]
+    assert c.delete("/vendors/ravi", params=q).status_code == 404
