@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownLeft, ArrowUpRight, Globe, RefreshCw } from "lucide-react";
+import { ArrowClockwise, ArrowDownLeft, ArrowUpRight, Globe } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Board from "../board";
 import Link from "next/link";
@@ -93,7 +93,7 @@ function Detail({ r }: { r: Row }) {
     <div>
       <div className="flex flex-wrap items-center gap-3">
         <span className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-sm">
-          <Icon className="size-4" strokeWidth={1.75} aria-hidden /> {text}
+          <Icon className="size-4" aria-hidden /> {text}
         </span>
         <span className={`font-semibold ${statusTone(r.call_status)}`}>{s(r.call_status)}</span>
         <span className="text-sm text-muted">{s(r.sub_status)}</span>
@@ -266,7 +266,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-end justify-between gap-4 pt-10">
         <h1 className="font-serif text-5xl">Every call, every detail</h1>
         <button onClick={load} className="flex items-center gap-2 rounded-full border border-line-strong px-3 py-1.5 text-sm hover:border-ink">
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} strokeWidth={1.75} aria-hidden /> Refresh
+          <ArrowClockwise className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden /> Refresh
         </button>
       </div>
 
@@ -302,7 +302,7 @@ export default function Dashboard() {
                   <li key={r.call_id}>
                     <button onClick={() => setSelected(r.call_id)} aria-current={r.call_id === selected}
                       className={`grid w-full grid-cols-[1.5rem_1fr_auto] items-start gap-3 px-2 py-3 text-left transition ${r.call_id === selected ? "bg-surface" : "hover:bg-surface/60"}`}>
-                      <Icon className="mt-1 size-4 text-bronze" strokeWidth={1.75} aria-label={text} />
+                      <Icon className="mt-1 size-4 text-bronze" aria-label={text} />
                       <span className="min-w-0">
                         <span className="flex flex-wrap items-baseline gap-x-3">
                           <span className="font-semibold tabular-nums">{s(r.from_number).slice(0, 18)}</span>

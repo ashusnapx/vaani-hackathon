@@ -1,5 +1,6 @@
 "use client";
 
+import { DeviceMobile, PhoneCall, Translate, User } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 
 // The languages Vaani's Sarvam voice and speech recognition cover, each in its own script.
@@ -43,18 +44,27 @@ export default function CallMe() {
     <form action={submit} className="rounded-2xl border border-line bg-paper/80 p-4">
       <p className="font-semibold">Or let Sorted call you</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <label className="sr-only" htmlFor="cm-name">Your name</label>
-        <input id="cm-name" name="name" placeholder="Your name" autoComplete="given-name"
-          className="min-w-0 rounded-full border border-line-strong bg-paper px-4 py-2 placeholder:text-muted" />
-        <label className="sr-only" htmlFor="cm-phone">Mobile number</label>
-        <input id="cm-phone" name="phone" required inputMode="tel" placeholder="Mobile number" autoComplete="tel"
-          className="min-w-0 rounded-full border border-line-strong bg-paper px-4 py-2 tabular-nums placeholder:text-muted" />
-        <button disabled={state === "calling"} className="pill-dark rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-50">
+        <label className="relative">
+          <span className="sr-only">Your name</span>
+          <User className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <input name="name" placeholder="Your name" autoComplete="given-name"
+            className="w-full min-w-0 rounded-full border border-line-strong bg-paper py-2 pr-4 pl-10 placeholder:text-muted" />
+        </label>
+        <label className="relative">
+          <span className="sr-only">Mobile number</span>
+          <DeviceMobile className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <input name="phone" required inputMode="tel" placeholder="Mobile number" autoComplete="tel"
+            className="w-full min-w-0 rounded-full border border-line-strong bg-paper py-2 pr-4 pl-10 tabular-nums placeholder:text-muted" />
+        </label>
+        <button disabled={state === "calling"} className="pill-dark flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-50">
+          <PhoneCall className="size-4" weight="fill" aria-hidden />
           {state === "calling" ? "Dialling…" : "Call me"}
         </button>
       </div>
 
-      <p id="cm-lang-label" className="mt-3 text-sm text-muted">Speak to me in</p>
+      <p id="cm-lang-label" className="mt-3 flex items-center gap-1.5 text-sm text-muted">
+        <Translate className="size-4" aria-hidden /> Speak to me in
+      </p>
       <div role="radiogroup" aria-labelledby="cm-lang-label" className="mt-1.5 flex flex-wrap gap-1.5">
         {LANGS.map(([id, native, english], i) => {
           const on = lang === id;

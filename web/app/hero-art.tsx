@@ -1,15 +1,15 @@
 "use client";
 
 import { animate, stagger } from "animejs";
-import { AirVent, PhoneCall, PlugZap, Wrench } from "lucide-react";
+import { Lightning, PhoneCall, Snowflake, Wrench } from "@phosphor-icons/react";
 import Image from "next/image";
 import { useEffect, useRef } from "react";
 
 // One call fans out to three repairmen and comes back as a yes. Positions are in % of a square stage.
 const VENDORS = [
-  { name: "Sharma Cooling", Icon: AirVent, y: 14, from: "₹1,100", to: "₹800", verdict: "Agreed", tone: "text-safe" },
+  { name: "Sharma Cooling", Icon: Snowflake, y: 14, from: "₹1,100", to: "₹800", verdict: "Agreed", tone: "text-safe" },
   { name: "Cool Care", Icon: Wrench, y: 46, from: "₹950", to: "₹750", verdict: "Best", tone: "text-family" },
-  { name: "Fix-It Electric", Icon: PlugZap, y: 78, from: "₹1,400", to: "₹1,200", verdict: "Over budget", tone: "text-pending" },
+  { name: "Fix-It Electric", Icon: Lightning, y: 78, from: "₹1,400", to: "₹1,200", verdict: "Over budget", tone: "text-pending" },
 ];
 
 export default function HeroArt() {
@@ -47,7 +47,7 @@ export default function HeroArt() {
       {/* the caller */}
       <div data-node className="absolute top-1/2 left-0 w-[24%] -translate-y-1/2 text-center">
         <div className="pill-dark mx-auto grid size-14 place-items-center rounded-full">
-          <PhoneCall className="size-6" strokeWidth={1.75} />
+          <PhoneCall className="size-6" />
         </div>
         <p className="mt-2 text-sm font-semibold">Priya</p>
         <p className="text-xs text-muted">AC not cooling<br />budget ₹800</p>
@@ -69,7 +69,7 @@ export default function HeroArt() {
         <div key={name} data-vendor className="absolute right-0 w-[40%] rounded-2xl border border-line bg-paper/90 p-3 shadow-[0_8px_24px_-14px_#1a1f2440]"
           style={{ top: `${y}%` }}>
           <div className="flex items-center gap-2">
-            <Icon className="size-4 text-bronze" strokeWidth={1.75} />
+            <Icon className="size-4 text-bronze" />
             <span className="truncate text-sm font-semibold">{name}</span>
           </div>
           <div className="mt-1.5 flex items-baseline gap-2">

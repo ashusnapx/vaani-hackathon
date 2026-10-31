@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2, UserPlus, X } from "lucide-react";
+import { PencilSimple, Trash, UserPlus, X } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
 
 type Vendor = { name: string; phone_tail: string; services: string[]; verified?: boolean; rating?: number | null; ratings?: number };
@@ -95,10 +95,10 @@ export default function Vendors() {
                         {v.verified ? "Verified" : "Verify"}
                       </button>
                       <button onClick={() => edit(v)} className="rounded-full p-2 text-muted hover:bg-surface hover:text-ink" aria-label={`Edit ${v.name}`}>
-                        <Pencil className="size-4" strokeWidth={1.75} />
+                        <PencilSimple className="size-4" />
                       </button>
                       <button onClick={() => remove(v.name)} className="rounded-full p-2 text-muted hover:bg-surface hover:text-scam" aria-label={`Delete ${v.name}`}>
-                        <Trash2 className="size-4" strokeWidth={1.75} />
+                        <Trash className="size-4" />
                       </button>
                     </li>
                   ))}
@@ -114,7 +114,7 @@ export default function Vendors() {
           <p className="font-serif text-2xl">{editing ? `Edit ${editing}` : "Add a service person"}</p>
           {editing && (
             <button type="button" onClick={reset} className="flex items-center gap-1 text-sm text-muted hover:text-ink">
-              <X className="size-4" strokeWidth={1.75} aria-hidden /> Cancel
+              <X className="size-4" aria-hidden /> Cancel
             </button>
           )}
         </div>
@@ -139,7 +139,7 @@ export default function Vendors() {
           </div>
         </fieldset>
         <button disabled={busy} className="pill-dark mt-5 flex w-full items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold disabled:opacity-50">
-          {editing ? <Pencil className="size-4" strokeWidth={1.75} aria-hidden /> : <UserPlus className="size-4" strokeWidth={1.75} aria-hidden />}
+          {editing ? <PencilSimple className="size-4" aria-hidden /> : <UserPlus className="size-4" aria-hidden />}
           {busy ? "Saving…" : editing ? "Save changes" : "Add service person"}
         </button>
         {error && <p className="mt-2 text-sm text-scam" role="alert">{error}</p>}

@@ -1,11 +1,11 @@
-import { EyeOff, FileAudio, HandCoins, PhoneOutgoing, Repeat } from "lucide-react";
+import { EyeSlash, FileAudio, HandCoins, PhoneOutgoing, Repeat } from "@phosphor-icons/react/dist/ssr";
 import { AfterSketch, BeforeSketch } from "./sketch-art";
 
 // Product facts for one job with three mechanics, not survey statistics.
 const ROWS = [
   [PhoneOutgoing, "Calls you make", "3+", "1"],
   [Repeat, "Times you explain the job", "3+", "1"],
-  [EyeOff, "People who hear your budget", "3", "0"],
+  [EyeSlash, "People who hear your budget", "3", "0"],
   [HandCoins, "Bargaining done for you", "0", "every call"],
   [FileAudio, "Calls on record", "0%", "100%"],
 ] as const;
@@ -37,7 +37,7 @@ export default function BeforeAfter() {
       <dl className="mt-4 divide-y divide-line rounded-3xl border border-line bg-paper/70">
         {ROWS.map(([Icon, label, before, after]) => (
           <div key={label} className="grid grid-cols-[1.5rem_1fr_auto_auto] items-center gap-x-4 px-6 py-4 sm:grid-cols-[1.5rem_1fr_8rem_8rem]">
-            <Icon className="size-5 text-bronze" strokeWidth={1.75} aria-hidden />
+            <Icon className="size-5 text-bronze" weight="duotone" aria-hidden />
             <dt>{label}</dt>
             <dd className="text-right font-serif text-3xl text-muted tabular-nums line-through decoration-scam/60 decoration-2">{before}</dd>
             <dd className="text-right font-serif text-3xl text-ink tabular-nums">{after}</dd>

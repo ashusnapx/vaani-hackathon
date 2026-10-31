@@ -1,9 +1,9 @@
-import { AirVent, Bug, Car, ChefHat, Hammer, PaintRoller, PlugZap, Smartphone, SprayCan, Truck, WashingMachine, Wrench } from "lucide-react";
+import { Bug, Drop, Car, CookingPot, DeviceMobile, Hammer, Lightning, PaintRoller, Snowflake, SprayBottle, Truck, WashingMachine } from "@phosphor-icons/react/dist/ssr";
 
 const SERVICES = [
-  [AirVent, "AC repair"], [Wrench, "Plumber"], [PlugZap, "Electrician"], [Hammer, "Carpenter"],
-  [PaintRoller, "Painter"], [SprayCan, "Deep cleaning"], [Bug, "Pest control"], [WashingMachine, "Appliances"],
-  [Smartphone, "Phone repair"], [Truck, "Movers"], [ChefHat, "Cook for a day"], [Car, "Driver"],
+  [Snowflake, "AC repair"], [Drop, "Plumber"], [Lightning, "Electrician"], [Hammer, "Carpenter"],
+  [PaintRoller, "Painter"], [SprayBottle, "Deep cleaning"], [Bug, "Pest control"], [WashingMachine, "Appliances"],
+  [DeviceMobile, "Phone repair"], [Truck, "Movers"], [CookingPot, "Cook for a day"], [Car, "Driver"],
 ] as const;
 
 export default function Services() {
@@ -13,7 +13,7 @@ export default function Services() {
       <ul className="mt-4 flex flex-wrap gap-2">
         {SERVICES.map(([Icon, label]) => (
           <li key={label} className="flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3.5 py-1.5 text-sm">
-            <Icon className="size-4 text-bronze" strokeWidth={1.75} aria-hidden />
+            <Icon className="size-4 text-bronze" weight="duotone" aria-hidden />
             {label}
           </li>
         ))}

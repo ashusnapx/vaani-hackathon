@@ -1,5 +1,5 @@
 import { ReactLenis } from "lenis/react";
-import { HandCoins, PhoneIncoming, PhoneOutgoing } from "lucide-react";
+import { Gauge, HandCoins, Phone, PhoneIncoming, PhoneOutgoing, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import Image from "next/image";
 import Link from "next/link";
 import BeforeAfter from "./before-after";
@@ -19,7 +19,7 @@ const SOURCES = [
 ] as const;
 
 const flow = [
-  [PhoneIncoming, "You call once", "Say the job, your address, when you need it and what you want to pay. In Hindi, English or Hinglish."],
+  [PhoneIncoming, "You call once", "Say the job, your address and what you want to pay. In English or your own language."],
   [PhoneOutgoing, "Sorted rings around", "It phones the local service people, asks each for a price and bargains towards yours."],
   [HandCoins, "You get a yes", "Sorted calls back with whoever agreed, the best one first and a backup, and their number."],
 ] as const;
@@ -38,10 +38,14 @@ export default function Home() {
             </a>
           </p>
           <div className="flex items-center gap-5">
-            <Link href="/dashboard" className="text-sm text-muted hover:text-ink">Dashboard</Link>
-            <Link href="/service-people" className="hidden text-sm text-muted hover:text-ink sm:inline">Service people</Link>
-            <a href={`tel:${number.replace(/\s/g, "")}`} className="pill-dark rounded-full px-4 py-2 text-sm font-semibold tabular-nums">
-              Call {number}
+            <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-muted hover:text-ink">
+              <Gauge className="size-4" aria-hidden /> Dashboard
+            </Link>
+            <Link href="/service-people" className="hidden items-center gap-1.5 text-sm text-muted hover:text-ink sm:flex">
+              <UsersThree className="size-4" aria-hidden /> Service people
+            </Link>
+            <a href={`tel:${number.replace(/\s/g, "")}`} className="pill-dark flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold tabular-nums">
+              <Phone className="size-4" weight="fill" aria-hidden /> Call {number}
             </a>
           </div>
         </header>
@@ -73,7 +77,7 @@ export default function Home() {
           {flow.map(([Icon, title, body], i) => (
             <li key={title} className={`py-6 md:px-6 ${i ? "border-t border-line md:border-t-0 md:border-l" : "md:pl-0"}`}>
               <span className="grid size-10 place-items-center rounded-full border border-line bg-surface text-bronze">
-                <Icon className="size-5" strokeWidth={1.75} aria-hidden />
+                <Icon className="size-5" weight="duotone" aria-hidden />
               </span>
               <p className="mt-4 font-serif text-2xl">{title}</p>
               <p className="mt-2 max-w-[36ch] leading-relaxed text-muted">{body}</p>
