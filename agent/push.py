@@ -34,7 +34,12 @@ persona = {
         },
     },
     "senses_capabilities": json.loads((HERE / "senses.json").read_text()),
+    # A scam number that calls back is recognised from its last calls.
+    "memories": {"use_previous_call_contexts": True, "max_history_calls": 5},
 }
+
+NUMBER = "+918064279097"
+deployment = {"deployment": {"phone": {"call_type": {"Inbound": NUMBER, "Outbound": [NUMBER]}}}}
 
 experience = {
     "conversational_experience": {
@@ -52,7 +57,8 @@ experience = {
             "idle_call_hangup_message": "Lagta hai line kat gayi. Main call band kar raha hoon, namaste.",
         },
         "end_call": {"enabled": True, "end_call_phrase": "Dhanyavaad, namaste."},
-        "call_settings": {"max_call_duration": 10, "max_duration_enabled": True},
+        "call_settings": {"max_call_duration": 10, "max_duration_enabled": True,
+                          "enable_voicemail_detection": True, "action": "hang_up"},
     },
 }
 
@@ -126,7 +132,7 @@ else:
     id_file.write_text(agent_id + "\n")
     print("created", agent_id)
 
-for section, body in [("persona", persona), ("training", training), ("experience", experience), ("analysis", analysis)]:
+for section, body in [("persona", persona), ("training", training), ("experience", experience), ("analysis", analysis), ("deployment", deployment)]:
     r = httpx.patch(f"{API}/agent/{agent_id}/{section}", headers=H, json=body, timeout=60)
     print(section, r.status_code, "" if r.is_success else r.text[:400])
     if not r.is_success:
