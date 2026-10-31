@@ -2,6 +2,7 @@
 
 import { DeviceMobile, PhoneCall, Translate, User } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 // The languages Vaani's Sarvam voice and speech recognition cover, each in its own script.
 // The backend checks the id again, so this list only decides what's offered.
@@ -19,14 +20,25 @@ export default function CallMe() {
 
   async function submit(form: FormData) {
     setState("calling");
+    const english = LANGS.find(([id]) => id === lang)?.[2] ?? "English";
+    const id = toast.loading("Dialling you…", { description: "From +91 80642 79097" });
     const r = await fetch("/api/call-me", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: form.get("name"), phone: form.get("phone"), language: lang }),
     }).catch(() => null);
-    if (r?.ok) return setState("done");
+    if (r?.ok) {
+      toast.success("Sorted is calling you", {
+        id,
+        duration: 8000,
+        description: `Pick up the call from +91 80642 79097. We'll ask your address, the issue and your budget, in ${english}.`,
+      });
+      return setState("done");
+    }
     const detail = r ? (await r.json().catch(() => ({}))).detail : null;
-    setError(typeof detail === "string" ? detail : "Couldn't start the call. Try calling the number instead.");
+    const message = typeof detail === "string" ? detail : "Couldn't start the call. Try calling the number instead.";
+    toast.error("Couldn't place the call", { id, description: message, duration: 8000 });
+    setError(message);
     setState("error");
   }
 

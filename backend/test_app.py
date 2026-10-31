@@ -378,3 +378,9 @@ def test_speaker_sets_one_language_for_ears_and_voice():
     s = m.speaker("ta")
     assert s["language"] == "ta" and s["mouth"]["tts"]["primary"]["config"]["language"] == "ta"
     assert m.MULTILINGUAL["mouth"]["tts"]["primary"]["config"]["language"] == "hi"  # the shared default is untouched
+
+
+def test_call_me_says_so_when_vaani_refuses(monkeypatch):
+    monkeypatch.setattr(m, "dispatch", lambda *a, **k: None)
+    r = c.post("/actions/call-me", params={"key": "k"}, json={"name": "Asha", "phone": "9876543210"})
+    assert r.status_code == 502 and "couldn't place the call" in r.json()["detail"]

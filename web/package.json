@@ -15,7 +15,8 @@
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "roughjs": "^4.6.6"
+    "roughjs": "^4.6.6",
+    "sonner": "^2.0.8"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

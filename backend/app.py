@@ -858,9 +858,11 @@ def call_me(body: CallMe, key: str | None = Query(None)):
               "name in the read-back and the thank-you.")
     greeting = (f"Hi {name}, this is Sorted. You asked us to call you. What needs fixing?" if name else
                 "Hi, this is Sorted. You asked us to call you. May I have your name?")
-    dispatch("intake_call", name or "Website caller", phone, prompt, greeting,
-             {"phone": phone, "name": name, "language": body.language}, lang=body.language)
-    return {"ok": True}
+    call_id = dispatch("intake_call", name or "Website caller", phone, prompt, greeting,
+                       {"phone": phone, "name": name, "language": body.language}, lang=body.language)
+    if not call_id:
+        raise HTTPException(status_code=502, detail="Vaani couldn't place the call just now. Try again, or ring +91 80642 79097.")
+    return {"ok": True, "call_id": call_id}
 
 
 class VendorIn(BaseModel):
