@@ -2,12 +2,19 @@ import { ReactLenis } from "lenis/react";
 import { HandCoins, PhoneIncoming, PhoneOutgoing } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import BeforeAfter from "./before-after";
 import Board from "./board";
 import CallMe from "./call-me";
 import HeroArt from "./hero-art";
 import Services from "./services";
 
 const number = process.env.NEXT_PUBLIC_SORTED_NUMBER || "+91 80642 79097";
+
+const SOURCES = [
+  ["HDFC Sky, Urban Company RHP key details", "https://hdfcsky.com/news/urban-company-ipo-opens-on-september-10-key-details-and-risks-from-rhp"],
+  ["Finology, Urban Company analysis", "https://recipe.finology.in/discover/premium-stock-research/urban-company-fundamental-analysis"],
+  ["Outlook Business, Redseer online home services report", "https://www.outlookbusiness.com/news/indias-online-home-services-market-to-grow-at-22-to-hit-88-billion-by-fy30-report"],
+] as const;
 
 const flow = [
   [PhoneIncoming, "You call once", "Say the job, your address, when you need it and what you want to pay. In Hindi, English or Hinglish."],
@@ -76,6 +83,8 @@ export default function Home() {
           ))}
         </ol>
 
+        <BeforeAfter />
+
         <Services />
 
         <Board />
@@ -93,6 +102,17 @@ export default function Home() {
             </span>
           </a>
           <span>Pay the service person directly. Never share an OTP on a call.</span>
+          <p className="w-full border-t border-line pt-4 text-xs leading-relaxed">
+            Sources: market size ($60B, FY25), unorganised share (90.5%, FY25) and online share (under 1%) are
+            Redseer figures as cited in coverage of Urban Company&rsquo;s 2025 IPO filing:{" "}
+            {SOURCES.map(([label, href], i) => (
+              <span key={href}>
+                <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">{label}</a>
+                {i < SOURCES.length - 1 ? ", " : "."}
+              </span>
+            ))}{" "}
+            Before-and-after figures describe Sorted&rsquo;s own flow for one job priced by three mechanics.
+          </p>
         </footer>
       </div>
     </ReactLenis>
