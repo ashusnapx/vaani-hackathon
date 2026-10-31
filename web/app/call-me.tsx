@@ -15,7 +15,10 @@ const LANGS = [
 export default function CallMe() {
   const [state, setState] = useState<"idle" | "calling" | "done" | "error">("idle");
   const [error, setError] = useState("");
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState("en"); // English unless they pick another
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const ready = name.trim().length > 0 && phone.replace(/\D/g, "").length >= 10;
   const pills = useRef<(HTMLButtonElement | null)[]>([]);
 
   async function submit(form: FormData) {
@@ -25,7 +28,7 @@ export default function CallMe() {
     const r = await fetch("/api/call-me", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.get("name"), phone: form.get("phone"), language: lang }),
+      body: JSON.stringify({ name: name.trim(), phone, language: lang }),
     }).catch(() => null);
     if (r?.ok) {
       toast.success("Sorted is calling you", {
@@ -59,16 +62,17 @@ export default function CallMe() {
         <label className="relative">
           <span className="sr-only">Your name</span>
           <User className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
-          <input name="name" placeholder="Your name" autoComplete="given-name"
+          <input name="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="given-name"
             className="w-full min-w-0 rounded-full border border-line-strong bg-paper py-2 pr-4 pl-10 placeholder:text-muted" />
         </label>
         <label className="relative">
           <span className="sr-only">Mobile number</span>
           <DeviceMobile className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
-          <input name="phone" required inputMode="tel" placeholder="Mobile number" autoComplete="tel"
+          <input name="phone" required value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Mobile number" autoComplete="tel"
             className="w-full min-w-0 rounded-full border border-line-strong bg-paper py-2 pr-4 pl-10 tabular-nums placeholder:text-muted" />
         </label>
-        <button disabled={state === "calling"} className="pill-dark flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-50">
+        <button disabled={!ready || state === "calling"} title={ready ? undefined : "Enter your name and a 10-digit mobile number"}
+          className="pill-dark flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition disabled:opacity-40 disabled:shadow-none">
           <PhoneCall className="size-4" weight="fill" aria-hidden />
           {state === "calling" ? "Dialling…" : "Call me"}
         </button>
@@ -102,7 +106,8 @@ export default function CallMe() {
 
       <p className="mt-3 text-sm text-muted" role="status">
         {state === "done" ? "Your phone rings in a few seconds, from +91 80642 79097."
-          : state === "error" ? error : "Asks only your address, the issue and your budget."}
+          : state === "error" ? error
+          : ready ? "Asks only your address, the issue and your budget." : "Add your name and number to get a call."}
       </p>
     </form>
   );

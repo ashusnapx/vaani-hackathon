@@ -32,6 +32,9 @@ html {
 ::selection { background: #8c6b4533; color: var(--color-ink); }
 /* Focus keeps each element's own shape: a thin ring for buttons and links, a soft halo for fields. */
 :focus-visible { outline: 1.5px solid var(--color-bronze); outline-offset: 2px; }
+/* Tailwind resets buttons to the default cursor; anything clickable should say so. */
+button:not(:disabled), [role="button"], [role="radio"], summary { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--color-bronze);
