@@ -337,3 +337,20 @@ def test_editing_a_vendor_can_keep_the_number_on_file():
     assert (ravi["phone_tail"], ravi["services"]) == ("8888", ["electrical"])
     assert c.post("/vendors", params=q, json={"name": "Newbie", "phone": ""}).status_code == 422
     c.delete("/vendors/ravi", params=q)
+
+
+def test_website_caller_is_only_asked_what_the_form_did_not_give(monkeypatch):
+    sent = []
+    monkeypatch.setattr(m, "dispatch", lambda kind, name, phone, prompt, greeting, tag, analysis=None, senses=None: sent.append((prompt, greeting, tag)) or "c-web")
+    q = {"key": "k"}
+    assert c.post("/actions/call-me", params=q, json={"name": "Priya", "phone": "98765 43210"}).json()["ok"]
+    prompt, greeting, tag = sent[-1]
+    assert "Hi Priya" in greeting and "only for the address, the issue and the budget" in prompt and tag["name"] == "Priya"
+    c.post("/actions/call-me", params=q, json={"name": "", "phone": "9876543210"})
+    assert "May I have your name" in sent[-1][1] and "starting with their name" in sent[-1][0]
+    # the name from the form fills the request when the call itself never said it
+    m.TASKS.clear()
+    m.PLACED["c-web"] = {"kind": "intake_call", "phone": "+919876543210", "name": "Priya"}
+    m.handle({"call_id": "c-web", "call_status": "Completed", "post_processing_status": "completed",
+              "call_entity": {"service": "AC repair", "details": "not cooling", "budget": "800", "address": "Koramangala"}})
+    assert next(iter(m.TASKS.values()))["name"] == "Priya"

@@ -35,7 +35,7 @@ export default function CallMe() {
       </div>
       <p className="mt-2 text-sm text-muted" role="status">
         {state === "done" ? "Your phone will ring in a few seconds, from +91 80642 79097."
-          : state === "error" ? error : "Sorted rings you and takes the request on that call."}
+          : state === "error" ? error : "Sorted rings you and asks only for your address, the issue and your budget."}
       </p>
     </form>
   );

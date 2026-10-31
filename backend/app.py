@@ -637,7 +637,8 @@ def handle(row: dict) -> bool:
         if intent in ("cancel", "reschedule"):
             change_request(phone, intent, e.get("new_time"))
             return True
-        res = start_task({"name": e.get("customer_name"), "phone": phone, "address": e.get("address"),
+        # A website caller gave their name in the form, so the call never asked for it.
+        res = start_task({"name": e.get("customer_name") or placed.get("name"), "phone": phone, "address": e.get("address"),
                           "area": e.get("area"), "service": e.get("service"), "details": e.get("details"),
                           "when": e.get("when"), "budget": e.get("budget"), "category": e.get("category")})
         if "missing" in res:
@@ -816,12 +817,17 @@ def call_me(body: CallMe, key: str | None = Query(None)):
     if len(digits(body.phone)) != 10:
         raise HTTPException(status_code=422, detail="Enter a 10-digit Indian mobile number")
     phone = "+91" + digits(body.phone)
-    name = clean(body.name, 40) or "there"
+    name = clean(body.name, 40)
+    known = ("You already know their name and number from the website; never ask for either. Of the four "
+             "things, ask only for the address, the issue and the budget." if name else
+             "You already know their number from the website; never ask for it. Ask for the other four things "
+             "as usual, starting with their name.")
     prompt = (INTAKE_PROMPT + "\n\n# This call\nYou are calling this person because they asked Sorted to "
-              f"call them back.{fence(name=name, phone_digits=spoken(phone))}Their number is known; read it "
-              "back to confirm instead of asking for it.")
-    greeting = f"Hi {name}, this is Sorted. You asked us to call you. What can I get done for you today?"
-    dispatch("intake_call", name, phone, prompt, greeting, {"phone": phone})
+              f"call them from the website.{fence(name=name, phone_digits=spoken(phone))}{known} Use their "
+              "name in the read-back and the thank-you.")
+    greeting = (f"Hi {name}, this is Sorted. You asked us to call you. What needs fixing?" if name else
+                "Hi, this is Sorted. You asked us to call you. May I have your name?")
+    dispatch("intake_call", name or "Website caller", phone, prompt, greeting, {"phone": phone, "name": name})
     return {"ok": True}
 
 
