@@ -101,21 +101,23 @@ function journey(id: string, events: Ev[], row?: Row, rows: Row[] = [], request?
 
 function Graph({ steps, current }: { steps: Step[]; current: string }) {
   return (
-    <ol className="relative -my-4 flex gap-0 overflow-x-auto px-2 py-7" data-lenis-prevent>
+    // Every step takes an equal share of the width, so the track never scrolls sideways; phones stack it.
+    <ol className="relative grid gap-y-5 py-6 md:[grid-template-columns:repeat(var(--n),minmax(0,1fr))] md:gap-y-0"
+      style={{ "--n": steps.length } as React.CSSProperties}>
       {steps.map((st, i) => {
         const tone = st.state === "done" ? "bg-ink text-paper border-ink" : st.state === "live" ? "bg-bronze text-paper border-bronze" : "bg-paper text-muted border-line-strong";
         const node = (
-          <div className="flex w-36 shrink-0 flex-col items-center text-center sm:w-40">
-            <div className="relative flex w-full items-center">
-              <span className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : steps[i - 1].state === "done" ? "bg-ink" : "border-t-2 border-dashed border-line-strong bg-transparent"}`} />
-              <span className={`relative grid size-12 place-items-center rounded-full border-2 ${tone} ${st.call === current ? "ring-4 ring-bronze/30" : ""}`}>
+          <div className="flex w-full min-w-0 flex-col items-center text-center">
+            <div className="relative flex w-full items-center justify-center">
+              <span className={`hidden h-0.5 flex-1 md:block ${i === 0 ? "bg-transparent" : steps[i - 1].state === "done" ? "bg-ink" : "border-t-2 border-dashed border-line-strong bg-transparent"}`} />
+              <span className={`relative grid size-11 shrink-0 place-items-center rounded-full border-2 ${tone} ${st.call === current ? "ring-4 ring-bronze/30" : ""}`}>
                 {st.state === "live" && <span className="absolute inset-0 animate-ping rounded-full bg-bronze/40" aria-hidden />}
                 <st.Icon className="relative size-5" weight={st.state === "done" ? "fill" : "regular"} />
               </span>
-              <span className={`h-0.5 flex-1 ${i === steps.length - 1 ? "bg-transparent" : st.state === "done" ? "bg-ink" : "border-t-2 border-dashed border-line-strong bg-transparent"}`} />
+              <span className={`hidden h-0.5 flex-1 md:block ${i === steps.length - 1 ? "bg-transparent" : st.state === "done" ? "bg-ink" : "border-t-2 border-dashed border-line-strong bg-transparent"}`} />
             </div>
-            <p className={`mt-3 text-sm font-semibold ${st.state === "waiting" || st.state === "skipped" ? "text-muted" : ""} ${st.state === "skipped" ? "line-through" : ""}`}>{st.title}</p>
-            {st.caption ? <p className="mt-0.5 px-2 text-xs text-muted">{st.caption}</p> : null}
+            <p className={`mt-3 w-full truncate px-1 text-sm font-semibold ${st.state === "waiting" || st.state === "skipped" ? "text-muted" : ""} ${st.state === "skipped" ? "line-through" : ""}`} title={st.title}>{st.title}</p>
+            {st.caption ? <p className="mt-0.5 line-clamp-2 px-1 text-xs break-words text-muted" title={st.caption}>{st.caption}</p> : null}
           </div>
         );
         return (
