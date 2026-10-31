@@ -3,3 +3,4 @@
 !.env.example
 docs/vaani/*
 !docs/vaani/sync.sh
+__pycache__/
