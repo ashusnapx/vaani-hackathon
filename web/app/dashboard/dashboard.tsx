@@ -1,10 +1,9 @@
 "use client";
 
-import { ArrowClockwiseIcon as ArrowClockwise } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon as ArrowClockwise, InfoIcon as Info } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import Link from "next/link";
-import { type Agent, type Ev, type Row, direction, dur, inr, label, s, statusTone, when } from "./call-detail";
+import { type Agent, type Ev, type Row, direction, dur, inr, s, statusTone, when } from "./call-detail";
 
 /** The calls that make up one request, in order: the customer's, each vendor's, the callback, and so on. */
 export function requestCalls(t: Ev, events: Ev[], rows: Row[]) {
@@ -63,7 +62,7 @@ function Requests({ events, rows }: { events: Ev[]; rows: Row[] }) {
               : has("declined") ? ["Declined", "text-scam"] : has("decision") ? ["Calling back", "text-pending"] : ["Finding people", "text-pending"];
             const calls = requestCalls(t, events, rows);
             return (
-              <article key={t.id} className="rounded-3xl border border-line bg-paper/80 p-5">
+              <article key={t.id} className="min-w-0 rounded-3xl border border-line bg-paper/80 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="font-serif text-2xl leading-tight">{s(t.name)} · {s(t.service)}</p>
@@ -144,14 +143,26 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const scores = rows.map((r) => (r.call_conversation_quality as Record<string, number> | null)?.overall_quality).filter((v): v is number => typeof v === "number");
+    const unbilled = rows.filter((r) => !r.billing_finalized).length;
+    // a request counts once, however many times its booking was redone
+    const requests = new Set(events.filter((e) => e.type === "task").map((e) => e.task_id)).size;
+    const booked = new Set(events.filter((e) => e.type === "booked").map((e) => e.task_id)).size;
+    const vaani = "Vaani's call history for Sorted's agent, the latest 200 calls";
     return [
-      ["Calls", rows.length],
-      ["Talk time", dur(rows.reduce((a, r) => a + Number(r.duration_ms ?? 0), 0))],
-      ["Spend", inr(rows.reduce((a, r) => a + Number(r.call_cost ?? 0), 0))],
-      ["Avg quality", scores.length ? `${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)}/10` : "—"],
-      ["Requests", events.filter((e) => e.type === "task").length],
-      ["Booked", events.filter((e) => e.type === "booked").length],
-    ] as const;
+      { k: "Calls", v: rows.length, what: "Every call on Sorted's line: customers calling in, website calls, and Sorted calling customers and service people.",
+        from: vaani, how: `A count of the calls listed: ${rows.length}.` },
+      { k: "Talk time", v: dur(rows.reduce((a, r) => a + Number(r.duration_ms ?? 0), 0)), what: "How long all those calls lasted, together.",
+        from: vaani, how: `Each call's duration added up across ${rows.length} calls, shown as minutes:seconds.` },
+      { k: "Spend", v: inr(rows.reduce((a, r) => a + Number(r.call_cost ?? 0), 0)), what: "What Vaani charged for those calls, in rupees.",
+        from: vaani, how: `Each call's cost added up.${unbilled ? ` ${unbilled} of them aren't final on Vaani yet, so this can still move.` : ""}` },
+      { k: "Avg quality", v: scores.length ? `${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)}/10` : "—",
+        what: "Vaani's own 0 to 10 score for how well a conversation went, given after the call.",
+        from: vaani, how: `The average overall score of the ${scores.length} of ${rows.length} calls Vaani has scored. Unscored calls are left out.` },
+      { k: "Requests", v: requests, what: "Jobs people asked Sorted to get done, by calling in or from the website.",
+        from: "Sorted's own record of what it did, not Vaani", how: `A count of distinct requests Sorted opened: ${requests}.` },
+      { k: "Booked", v: booked, what: "Requests where the customer said yes to a service person.",
+        from: "Sorted's own record of what it did, not Vaani", how: `Requests with a booking: ${booked} of ${requests}.` },
+    ];
   }, [rows, events]);
 
   return (
@@ -164,10 +175,22 @@ export default function Dashboard() {
       </div>
 
       <dl className="mt-6 grid grid-cols-3 gap-x-6 gap-y-4 border-y border-line py-5 lg:grid-cols-6">
-        {stats.map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-xs text-muted">{k}</dt>
+        {stats.map(({ k, v, what, from, how }, i) => (
+          <div key={k} className="group relative">
+            <dt className="flex items-center gap-1 text-xs text-muted">
+              {k}
+              {/* hover on a mouse, tap (focus) on a phone */}
+              <button type="button" aria-label={`What ${k} means`} aria-describedby={`stat-${i}`} className="rounded-full p-0.5 hover:text-ink focus-visible:text-ink">
+                <Info className="size-3.5" aria-hidden />
+              </button>
+            </dt>
             <dd className="font-serif text-3xl tabular-nums">{v}</dd>
+            <div id={`stat-${i}`} role="tooltip"
+              className={`pointer-events-none invisible absolute top-full z-20 mt-2 w-64 rounded-2xl border border-line bg-paper p-3.5 text-sm opacity-0 shadow-[0_18px_40px_-20px_#1a1f2455] transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${["left-0", "left-1/2 -translate-x-1/2", "right-0"][i % 3]}`}>
+              <p>{what}</p>
+              <p className="mt-2 text-muted"><span className="font-semibold text-ink">From </span>{from}.</p>
+              <p className="mt-1 text-muted"><span className="font-semibold text-ink">How </span>{how}</p>
+            </div>
           </div>
         ))}
       </dl>
