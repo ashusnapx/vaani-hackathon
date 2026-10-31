@@ -19,10 +19,10 @@ const priced = (q?: Record<string, unknown> | null) =>
   !q || !q.price ? "—" : `${inr(q.price)}${q.price_max ? `–${Number(q.price_max).toLocaleString("en-IN")}` : ""}${q.open ? "+" : ""}`;
 
 /** Every step a request takes, rebuilt from Sorted's event log. */
-function journey(id: string, events: Ev[], row?: Row, rows: Row[] = []) {
-  const tagged = events.find((e) => e.call_id === id && e.task_id);
+function journey(id: string, events: Ev[], row?: Row, rows: Row[] = [], request?: string) {
+  const tagged = request ? undefined : events.find((e) => e.call_id === id && e.task_id);
   const said = (row?.call_entity ?? {}) as Record<string, unknown>;
-  const taskId = tagged?.task_id
+  const taskId = request ?? tagged?.task_id
     ?? events.find((e) => e.type === "task" && e.intake_call_id === id)?.task_id
     // a customer call from before requests remembered their first call: match who and what
     ?? events.find((e) => e.type === "task" && !e.intake_call_id && said.customer_name && e.name === said.customer_name && e.service === said.service)?.task_id;
@@ -266,7 +266,7 @@ function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: R
   );
 }
 
-export default function Journey({ id }: { id: string }) {
+export default function Journey({ id, request }: { id: string; request?: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [events, setEvents] = useState<Ev[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -291,7 +291,7 @@ export default function Journey({ id }: { id: string }) {
     const el = document.getElementById(`call-${id}`);
     if (el) { el.scrollIntoView({ block: "start" }); setLanded(true); }
   });
-  const j = useMemo(() => journey(id, events, row, rows), [id, events, row, rows]);
+  const j = useMemo(() => journey(id, events, row, rows, request), [id, events, row, rows, request]);
   const related = j ? rows.filter((r) => j.calls.includes(r.call_id)) : row ? [row] : [];
   const stats = [
     ["Calls", related.length || "—"],

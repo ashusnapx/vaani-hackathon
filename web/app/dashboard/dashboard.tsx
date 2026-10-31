@@ -4,12 +4,31 @@ import { ArrowClockwiseIcon as ArrowClockwise } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import Trace from "./trace";
 import { type Agent, type Ev, type Row, direction, dur, inr, label, s, statusTone, when } from "./call-detail";
 
-/** One row per request: who, what, where it stands, and the best price so far. Opens its journey. */
-function Requests({ events }: { events: Ev[] }) {
-  const tasks = events.filter((e) => e.type === "task");
+/** The calls that make up one request, in order: the customer's, each vendor's, the callback, and so on. */
+export function requestCalls(t: Ev, events: Ev[], rows: Row[]) {
+  const mine = events.filter((e) => e.task_id === t.task_id && e.call_id).sort((a, b) => a.id - b.id);
+  const placed = new Set(mine.map((e) => String(e.call_id)));
+  const intake = t.intake_call_id ? String(t.intake_call_id) : [...rows].reverse().find((r) => {
+    const e = (r.call_entity ?? {}) as Record<string, unknown>;
+    return !placed.has(r.call_id) && e.customer_name === t.name && e.service === t.service;
+  })?.call_id;
+  const role: Record<string, (e: Ev) => string> = {
+    vendor_call: (e) => `Sorted → ${s(e.vendor)}`, callback: () => `Sorted → ${s(t.name)}, with the options`,
+    confirm_call: (e) => `Sorted → ${s(e.vendor)}, to confirm`, rating_call: () => `Sorted → ${s(t.name)}, for a rating`,
+    change_call: (e) => `Sorted → ${s(e.vendor)}, about a change`,
+  };
+  const list = [
+    ...(intake ? [{ id: intake, who: `${s(t.name)} ↔ Sorted, the request` }] : []),
+    ...mine.filter((e) => role[e.type]).map((e) => ({ id: String(e.call_id), who: role[e.type](e) })),
+  ];
+  return list.map((c) => ({ ...c, row: rows.find((r) => r.call_id === c.id) }));
+}
+
+/** Each request as one card, with its calls grouped underneath. */
+function Requests({ events, rows }: { events: Ev[]; rows: Row[] }) {
+  const tasks = events.filter((e) => e.type === "task").sort((a, b) => b.id - a.id);
   const [busy, setBusy] = useState(false);
   const rehearse = async (k: string) => {
     setBusy(true);
@@ -30,35 +49,46 @@ function Requests({ events }: { events: Ev[] }) {
       {tasks.length === 0 ? (
         <p className="mt-4 border-y border-line py-6 text-muted">No requests yet. A customer call, or “Call me” on the home page, starts one.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-line border-y border-line">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           {tasks.map((t) => {
             const mine = events.filter((e) => e.task_id === t.task_id);
-            const has = (type: string) => mine.find((e) => e.type === type);
+            const has = (type: string) => [...mine].reverse().find((e) => e.type === type);
             const booked = has("booked");
             const best = (has("decision")?.best ?? null) as Record<string, unknown> | null;
-            const quotes = mine.filter((e) => e.type === "quote").length;
-            const status = has("cancelled") ? "Cancelled" : booked ? "Booked" : has("decision") ? "Calling back" : `Ringing · ${quotes} quote${quotes === 1 ? "" : "s"}`;
-            const row = (
-              <span className="grid grid-cols-[1fr_auto] items-center gap-4 px-2 py-3">
-                <span className="min-w-0">
-                  <span className="font-semibold">{s(t.name)}</span>
-                  <span className="text-muted"> · {s(t.service)} · {s(t.area)}</span>
-                </span>
-                <span className="flex items-center gap-3 text-sm">
-                  <span className="tabular-nums">{booked ? inr(booked.price) : best ? inr(best.price) : inr(t.budget)}</span>
-                  <span className={`label text-[0.65rem] ${booked ? "text-safe" : has("cancelled") ? "text-scam" : "text-pending"}`}>{status}</span>
-                </span>
-              </span>
-            );
+            const status = has("cancelled") ? ["Cancelled", "text-scam"] : booked ? ["Booked", "text-safe"]
+              : has("declined") ? ["Declined", "text-scam"] : has("decision") ? ["Calling back", "text-pending"] : ["Finding people", "text-pending"];
+            const calls = requestCalls(t, events, rows);
             return (
-              <li key={t.id}>
-                {t.intake_call_id ? (
-                  <Link href={`/dashboard/call/${encodeURIComponent(String(t.intake_call_id))}`} className="block rounded-xl transition hover:bg-surface/70">{row}</Link>
-                ) : row}
-              </li>
+              <article key={t.id} className="rounded-3xl border border-line bg-paper/80 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-serif text-2xl leading-tight">{s(t.name)} · {s(t.service)}</p>
+                    <p className="mt-1 text-sm text-muted">
+                      {t.category_label ? `${s(t.category_label)} · ` : ""}{s(t.area)} · budget {inr(t.budget)}
+                      {booked ? ` · booked at ${inr(booked.price)}` : best ? ` · best ${inr(best.price)}` : ""}
+                    </p>
+                  </div>
+                  <span className={`stamp shrink-0 text-xs ${status[1]}`}>{status[0]}</span>
+                </div>
+                <ol className="mt-4 space-y-1 border-l-2 border-line pl-4">
+                  {calls.length === 0 && <li className="text-sm text-muted">No calls yet.</li>}
+                  {calls.map((c, i) => (
+                    <li key={c.id} className="relative">
+                      <span className="absolute top-2.5 -left-[1.3rem] size-2.5 rounded-full border-2 border-paper bg-ink" aria-hidden />
+                      <Link href={`/dashboard/request/${encodeURIComponent(String(t.task_id))}#call-${c.id}`} className="block rounded-xl px-2 py-1.5 transition hover:bg-surface/70">
+                        <span className="text-sm"><span className="text-muted">Call {i + 1}</span> · <span className="font-semibold">{c.who}</span>
+                          {c.row ? <span className="text-muted tabular-nums"> · {dur(c.row.duration_ms)}</span> : null}</span>
+                        {c.row?.call_summary ? <span className="mt-0.5 block truncate text-xs text-muted">{String(c.row.call_summary).split(". ")[0]}</span> : null}
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+                <Link href={`/dashboard/request/${encodeURIComponent(String(t.task_id))}`}
+                  className="pill-dark mt-4 inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold">Open request</Link>
+              </article>
             );
           })}
-        </ul>
+        </div>
       )}
     </section>
   );
@@ -131,7 +161,8 @@ export default function Dashboard() {
     };
   }, [load]);
 
-  const shown = rows.filter((r) => filter === "All" || direction(r).text === filter);
+  const grouped = new Set(events.filter((e) => e.type === "task").flatMap((t) => requestCalls(t, events, rows).map((c) => c.id)));
+  const shown = rows.filter((r) => !grouped.has(r.call_id) && (filter === "All" || direction(r).text === filter));
 
   const stats = useMemo(() => {
     const scores = rows.map((r) => (r.call_conversation_quality as Record<string, number> | null)?.overall_quality).filter((v): v is number => typeof v === "number");
@@ -163,13 +194,11 @@ export default function Dashboard() {
         ))}
       </dl>
 
-      <Requests events={events} />
+      <Requests events={events} rows={rows} />
 
-      <h2 className="mt-12 font-serif text-3xl">Live trace</h2>
-      <p className="mt-1 text-sm text-muted">Sorted&rsquo;s line, and a branch for every request: each call, quote and decision in the order it happened.</p>
-      <Trace events={events} rows={rows} text={(e) => (EVENT_TEXT[e.type] ?? ((x: Ev) => label(x.type)))(e)} />
 
-      <h2 className="mt-12 font-serif text-3xl">Calls</h2>
+      <h2 className="mt-12 font-serif text-3xl">Other calls</h2>
+      <p className="mt-1 text-sm text-muted">Calls that aren&rsquo;t part of a request: tests, status checks, anything that didn&rsquo;t start a search.</p>
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <section>
           <div className="flex flex-wrap items-center gap-2">
