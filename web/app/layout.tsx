@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Archivo, Instrument_Serif, Kalam, Manrope } from "next/font/google";
-import { CheckCircleIcon as CheckCircle, SpinnerGapIcon as SpinnerGap, WarningCircleIcon as WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircleIcon as CheckCircle, InfoIcon as Info, SpinnerGapIcon as SpinnerGap, WarningCircleIcon as WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { Toaster } from "sonner";
 import "./globals.css";
+import LiveToasts from "./live-toasts";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 const kalam = Kalam({ variable: "--font-kalam", subsets: ["latin"], weight: "400" });
@@ -27,12 +28,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full font-sans">
         {children}
+        <LiveToasts />
         <Toaster
           position="top-center"
           icons={{
             success: <CheckCircle className="size-5 text-safe" weight="fill" />,
             error: <WarningCircle className="size-5 text-scam" weight="fill" />,
             loading: <SpinnerGap className="size-5 animate-spin text-bronze" />,
+            warning: <WarningCircle className="size-5 text-pending" weight="fill" />,
+            info: <Info className="size-5 text-family" weight="fill" />,
           }}
           toastOptions={{
             unstyled: true,

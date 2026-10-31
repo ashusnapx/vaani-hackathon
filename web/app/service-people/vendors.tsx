@@ -2,6 +2,7 @@
 
 import { PencilSimpleIcon as PencilSimple, TrashIcon as Trash, UserPlusIcon as UserPlus, XIcon as X } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type Vendor = { name: string; phone_tail: string; services: string[]; verified?: boolean; rating?: number | null; ratings?: number };
 type Category = { id: string; label: string };
@@ -46,19 +47,31 @@ export default function Vendors() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, phone, services: picked.length ? picked : ["*"] }),
     }).catch(() => null);
-    if (r?.ok) { reset(); load(); }
-    else setError(r ? String((await r.json().catch(() => ({}))).detail ?? "Couldn't save.") : "Backend unreachable.");
+    if (r?.ok) {
+      toast.success(editing ? `Saved ${name}` : `Added ${name}`, { description: picked.length ? picked.map(label).join(", ") : "Any job" });
+      reset();
+      load();
+    } else {
+      const msg = r ? String((await r.json().catch(() => ({}))).detail ?? "Couldn't save.") : "Backend unreachable.";
+      setError(msg);
+      toast.error("Couldn't save", { description: msg });
+    }
     setBusy(false);
   }
 
   async function verify(n: string) {
-    await fetch(`/api/vendors/${encodeURIComponent(n)}/verify`, { method: "POST" }).catch(() => null);
+    const r = await fetch(`/api/vendors/${encodeURIComponent(n)}/verify`, { method: "POST" }).catch(() => null);
+    const body = r ? await r.json().catch(() => ({})) : {};
+    if (r?.ok) toast.success(body.verified ? `${n} is verified` : `${n} is no longer verified`);
+    else toast.error(`Couldn't update ${n}`);
     load();
   }
 
   async function remove(n: string) {
     if (editing === n) reset();
-    await fetch(`/api/vendors/${encodeURIComponent(n)}`, { method: "DELETE" }).catch(() => null);
+    const r = await fetch(`/api/vendors/${encodeURIComponent(n)}`, { method: "DELETE" }).catch(() => null);
+    if (r?.ok) toast.success(`Removed ${n}`, { description: "Sorted won't ring them any more." });
+    else toast.error(`Couldn't remove ${n}`);
     load();
   }
 
