@@ -152,7 +152,7 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     fetch("/api/agent").then((r) => (r.ok ? r.json() : null)).then(setAgent).catch(() => {});
-    const t = setInterval(load, 60000) // safety net; the stream says when calls change;
+    const t = setInterval(load, 60000); // safety net: the stream says when calls change
     const es = new EventSource("/api/events?full=1");
     es.addEventListener("calls", () => load());
     es.onmessage = (m) => {

@@ -278,7 +278,7 @@ export default function Journey({ id, request }: { id: string; request?: string 
   useEffect(() => {
     const load = () => fetch("/api/calls?full=1").then((r) => (r.ok ? r.json() : [])).then(setRows).catch(() => {}).finally(() => setLoaded(true));
     load();
-    const t = setInterval(load, 60000) // safety net; the stream says when calls change;
+    const t = setInterval(load, 60000); // safety net: the stream says when calls change
     const es = new EventSource("/api/events?full=1");
     es.addEventListener("calls", () => load());
     es.onmessage = (m) => {
