@@ -15,6 +15,8 @@ app = FastAPI(title="Doorman")
 DOORMAN_KEY = os.getenv("DOORMAN_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+# ntfy topics are public to whoever knows the name, so it must be random.
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "")
 ELDER_NAME = os.getenv("ELDER_NAME", "Kamla ji")
 # Real numbers live in env, never in this public repo.
 # [{"name": "Rahul", "relation": "grandson", "phone": "+9198..."}]
@@ -38,20 +40,31 @@ def same_word(a: str | None, b: str) -> bool:
     return bool(b) and hmac.compare_digest(norm(a).encode(), norm(b).encode())
 
 
-def telegram(text: str) -> bool:
-    if not (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID):
-        print("telegram not configured:", text)
-        return False
+def telegram(text: str, urgent: bool = False) -> bool:
+    """Alert the family: ntfy push if a topic is set, else Telegram."""
+    plain = re.sub(r"</?b>", "", html.unescape(text))
     try:
-        r = httpx.post(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"},
-            timeout=5,
-        )
-        return r.status_code == 200
+        if NTFY_TOPIC:
+            r = httpx.post(
+                f"https://ntfy.sh/{NTFY_TOPIC}",
+                content=plain.encode(),
+                headers={"Priority": "urgent" if urgent else "default",
+                         "Tags": "warning" if urgent else "telephone_receiver"},
+                timeout=5,
+            )
+            return r.is_success
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+            r = httpx.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"},
+                timeout=5,
+            )
+            return r.status_code == 200
     except httpx.HTTPError as e:
-        print("telegram failed:", e)
+        print("alert failed:", e)
         return False
+    print("no alert channel configured:", plain)
+    return False
 
 
 def esc(v) -> str:
@@ -148,7 +161,8 @@ def alert_family(body: Alert, x_doorman_key: str | None = Header(None)):
         f"<b>Caller number:</b> {esc(body.caller_number)}\n\n"
         f"{esc(body.summary)}\n\n"
         "Doorman is keeping them on the line and sharing nothing. "
-        "Report: 1930 · cybercrime.gov.in"
+        "Report: 1930 · cybercrime.gov.in",
+        urgent=True,
     )
     return {"sent": sent, "next_step": "Family alerted. Keep refusing calmly; do not "
             "mention the alert to the caller."}
@@ -200,5 +214,5 @@ async def vaani_webhook(
 
 @app.get("/")
 def health():
-    return {"ok": True, "telegram": bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
+    return {"ok": True, "alerts": bool(NTFY_TOPIC or (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)),
             "contacts": len(TRUSTED_CONTACTS), "code_word": bool(FAMILY_CODE_WORD)}
