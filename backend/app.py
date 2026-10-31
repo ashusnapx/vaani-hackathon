@@ -247,13 +247,21 @@ VENDOR_FIELDS = extract(
     ("price_max", "If they gave a range or an estimate on top of a visit charge, the most it could come to, "
                   "in rupees as digits only. Empty for a single fixed price.", None),
     ("pricing_basis", "How they priced it.", ["fixed", "range", "visit_plus_parts", "per_hour", "after_inspection"]),
+    ("opening_price", "The first price they said, before any bargaining, in rupees as digits only.", None),
+    ("all_inclusive", "Does their final price include the visit charge and parts?", ["yes", "no", "unclear"]),
     ("eta", "When they said they can come.", None),
-    ("notes", "Anything important: where the price started, what is extra (parts, gas), why they declined.", None),
+    ("notes", "Anything important: what is extra (parts, gas), why they declined.", None),
 )
 CALLBACK_FIELDS = extract(
     ("chosen_vendor", "Exact name of the service person the customer chose to book, if any.", None),
     ("confirmed", "Did the customer clearly confirm the booking?", ["yes", "no"]),
+    ("counter_offer", "If the customer turned the offers down but named a price they would pay, that price in "
+                      "rupees as digits only.", None),
 )
+CONFIRM_FIELDS = extract(
+    ("price_confirmed", "Did the service person confirm the agreed price and time?", ["yes", "no"]),
+)
+MAX_ROUNDS = 2  # one counter-offer round, then we stop
 
 
 # ---- the engine: ring vendors, bargain, decide, call back, book ----
@@ -322,9 +330,15 @@ def ring_next(task_id: str) -> None:
         call_back(task_id)
         return
     lead = best_so_far(t)
-    leverage = (f" Another service person has already quoted {cost(lead)} rupees for this job. After they give "
-                "their price, if it is higher, mention that once, politely, and ask if they can match or beat it."
-                if lead else "")
+    if t.get("counter"):
+        leverage = (f" The customer has made a counter-offer of {t['counter']} rupees; this counter-offer is the "
+                    "only customer figure you may say. Ask if they can do the job for that. If not, ask their "
+                    "absolute final price.")
+    elif lead:
+        leverage = (f" Another service person has already quoted {cost(lead)} rupees for this job. After they give "
+                    "their price, if it is higher, mention that once, politely, and ask if they can match or beat it.")
+    else:
+        leverage = ""
     issue = t["details"] or t["service"]
     when = t["when"] or "as soon as possible"
     for v in wave:
@@ -336,7 +350,8 @@ def ring_next(task_id: str) -> None:
             "price including any visit charge. Accept whatever form the price comes in. If they give a range, "
             "note it and ask once what is the most it could come to. If they say it depends on inspection, "
             "ask their visit or inspection charge and a rough range for the work. If they charge per hour, ask "
-            "how many hours they expect. Then ask once, politely, whether that is their best price."
+            "how many hours they expect. Ask once whether the price includes the visit charge and any parts. "
+            "Then ask once, politely, whether that is their best price."
             f"{leverage} Never mention, hint at or confirm the customer's budget, even if asked directly; say "
             "the customer simply wants their best price. Before you end, repeat their price and time back "
             "clearly, for example 'So that's eight hundred to a thousand rupees, tomorrow at eleven.' Never "
@@ -357,7 +372,8 @@ def ring_next(task_id: str) -> None:
 OPEN_ENDED = ("visit_plus_parts", "per_hour", "after_inspection")
 
 
-def quote_in(task_id: str, vendor: str, low, high=None, eta: str = "", notes: str = "", basis: str = "") -> None:
+def quote_in(task_id: str, vendor: str, low, high=None, eta: str = "", notes: str = "", basis: str = "",
+             opening=None, all_in=None) -> None:
     """A vendor's final answer. Whether it fits is decided by the numbers, never by anyone's say-so.
 
     A fixed price fits when it is within budget. A range fits only when its top is; a range whose
@@ -376,11 +392,16 @@ def quote_in(task_id: str, vendor: str, low, high=None, eta: str = "", notes: st
     budget = t["budget"]
     agreed = bool(lo) and bool(hi or not open_ended) and (not budget or (hi or lo) <= budget)
     maybe = not agreed and bool(lo) and bool(budget) and lo <= budget
+    started = (amounts(opening) or [0])[0]
+    final = hi or lo
     quote = {"vendor": vendor, "price": lo, "price_max": hi if hi != lo else 0, "open": open_ended,
              "basis": basis or "fixed", "eta": clean(eta, 60), "agreed": agreed, "maybe": maybe,
-             "notes": clean(notes, 100), "at": time.time()}
-    publish("quote", task_id=task_id, budget=budget, **{k: quote[k] for k in
-            ("vendor", "price", "price_max", "open", "basis", "eta", "agreed", "maybe", "notes")})
+             "notes": clean(notes, 100), "at": time.time(),
+             "opening": started, "saved": max(0, started - final) if final else 0,
+             "all_in": None if all_in in (None, "", "unclear") else yes(all_in)}
+    publish("quote", task_id=task_id, budget=budget, round=t.get("rounds", 1), **{k: quote[k] for k in
+            ("vendor", "price", "price_max", "open", "basis", "eta", "agreed", "maybe", "notes",
+             "opening", "saved", "all_in")})
     with LOCK:
         t["quotes"][vendor] = quote
         done = all(name in t["quotes"] for name in t["in_wave"])
@@ -415,7 +436,7 @@ def decide(t: dict) -> dict:
     offered as such. Failing that, the closest offer over budget. Failing that, nothing.
     """
     priced = [q for q in t["quotes"].values() if q["price"]]
-    agreed = sorted((q for q in priced if q["agreed"]), key=lambda q: (cost(q), q["at"]))
+    agreed = sorted((q for q in priced if q["agreed"]), key=lambda q: (cost(q), q.get("all_in") is not True, q["at"]))
     if agreed:
         return {"mode": "agreed", "best": agreed[0], "backup": agreed[1] if len(agreed) > 1 else None}
     maybe = sorted((q for q in priced if q.get("maybe")), key=lambda q: (q["price"], q["at"]))
@@ -444,13 +465,16 @@ def call_back(task_id: str) -> None:
             backup=backup and {k: backup.get(k) for k in ("vendor", "price", "price_max", "open", "eta", "notes")})
 
     def offer(q):
+        extra = {True: "yes", False: "no, extras on top"}.get(q.get("all_in"), "not stated")
         return fence(name=q["vendor"], price=price_text(q), can_come=q["eta"], notes=q["notes"],
-                     phone_digits=spoken(phone_of(q["vendor"])))
+                     started_at=q.get("opening") or "", bargained_down_by=q.get("saved") or 0,
+                     includes_visit_and_parts=extra, phone_digits=spoken(phone_of(q["vendor"])))
 
     if d["mode"] == "agreed":
         situation = ("Best option:" + offer(best) + (("Backup option:" + offer(backup)) if backup else "")
-                     + "Recommend the best option in one sentence and say why (cheaper, or same price but "
-                     "agreed first), mention the backup, and ask which one to book.")
+                     + "Recommend the best option in one sentence and say why (cheaper, all-inclusive, or same "
+                     "price but agreed first). If Sorted bargained the price down, say by how much. Say whether "
+                     "the price includes the visit charge and parts. Mention the backup, and ask which one to book.")
     elif d["mode"] == "maybe":
         situation = ("Nobody gave a firm price within the budget, but this offer could fit:" + offer(best)
                      + (("Another that could fit:" + offer(backup)) if backup else "")
@@ -470,6 +494,8 @@ def call_back(task_id: str) -> None:
         + fence(customer=t["name"], job=t["service"], detail=t["details"], needed=t["when"],
                 budget_rupees=t["budget"])
         + situation
+        + " If they turn every option down, ask once what price they would be happy to pay, so Sorted can try "
+        "once more; then thank them and close."
         + " When they choose an option, say clearly 'Great, I'm booking <name>' using the name exactly as "
         "given, then read that service person's number slowly, digit by digit, and say the service person "
         "will get a call with their address and time. Only offer the options given here; never invent one. "
@@ -501,12 +527,27 @@ def confirm_vendor(task_id: str) -> None:
         + fence(service_person=t["booked"], customer=t["name"], job=t["service"], detail=t["details"],
                 price_rupees=q.get("price"), time=q.get("eta"), address=t["address"],
                 customer_phone_digits=spoken(t["phone"]))
-        + "Read the address and the customer's number slowly, confirm price and time in one sentence, ask "
-        "them to call the customer before leaving, thank them and end the call."
+        + "Read the address and the customer's number slowly. Then say the price and time and ask them to "
+        "confirm both out loud, because the call is recorded as the agreement. Ask them to call the customer "
+        "before leaving, thank them and end the call."
     )
     greeting = f"Hello, Sorted again. The customer has confirmed the {clean(t['service'], 40)} job with you. Could you note the address?"
     dispatch("confirm_call", t["booked"], phone_of(t["booked"]), prompt, greeting,
-             {"task_id": task_id, "vendor": t["booked"]}, senses=MULTILINGUAL)
+             {"task_id": task_id, "vendor": t["booked"]}, CONFIRM_FIELDS, MULTILINGUAL)
+
+
+def counter_round(task_id: str, offer: int) -> None:
+    """The customer named a price: take it back once to the closest vendor, then call the customer again."""
+    t = TASKS[task_id]
+    closest = best_so_far(t)
+    vendor = closest and next((v for v in VENDORS if v["name"] == closest["vendor"]), None)
+    if not vendor or t.get("rounds", 1) >= MAX_ROUNDS:
+        return
+    with LOCK:
+        t.update(rounds=t.get("rounds", 1) + 1, counter=offer, budget=offer, called_back=False,
+                 pending=[vendor], booked=None)
+    publish("counter", task_id=task_id, vendor=vendor["name"], offer=offer)
+    later(8, ring_next, task_id)
 
 
 def match_vendor(t: dict, said) -> str | None:
@@ -550,14 +591,23 @@ def handle(row: dict) -> bool:
         ok = str(e.get("can_do_job") or "").lower() != "no"
         quote_in(placed["task_id"], placed["vendor"], e.get("price_min") if ok else 0,
                  e.get("price_max") if ok else None, e.get("eta") or "",
-                 e.get("notes") or ("" if ok else "declined"), e.get("pricing_basis") or "")
+                 e.get("notes") or ("" if ok else "declined"), e.get("pricing_basis") or "",
+                 e.get("opening_price"), e.get("all_inclusive"))
     elif kind == "callback":
         t = TASKS.get(placed["task_id"])
         vendor = match_vendor(t, e.get("chosen_vendor")) if t and yes(e.get("confirmed")) else None
+        offer = rupees(e.get("counter_offer"))
         if vendor:
             book(placed["task_id"], vendor)
+        elif t and offer:
+            counter_round(placed["task_id"], offer)
         else:
             publish("declined", task_id=placed["task_id"], said=clean(e.get("chosen_vendor"), 60))
+    elif kind == "confirm_call":
+        t = TASKS.get(placed["task_id"])
+        q = (t or {}).get("quotes", {}).get(placed.get("vendor"), {})
+        publish("locked" if yes(e.get("price_confirmed")) else "lock_failed", task_id=placed["task_id"],
+                vendor=placed.get("vendor"), price=q.get("price"), call_id=call_id)
     return True
 
 
@@ -851,14 +901,18 @@ def demo(scenario: str, key: str | None = Query(None)):
         publish("quote", task_id=tid, vendor=b, price=0, eta="", agreed=False, notes="no answer", budget=800)
         publish("decision", task_id=tid, mode="over_budget", best={"vendor": a, "price": 1200, "eta": "tomorrow 9 am", "notes": ""}, backup=None)
     else:
-        publish("quote", task_id=tid, vendor=a, price=800, eta="tomorrow 9 am", agreed=True, notes="came down from 1,100", budget=800)
+        publish("quote", task_id=tid, vendor=a, price=800, eta="tomorrow 9 am", agreed=True, notes="", budget=800,
+                opening=1100, saved=300, all_in=False)
         publish("wave", task_id=tid, lead=800, note="Ringing the next one, with ₹800 to beat.")
         publish("vendor_call", task_id=tid, vendor=b, to=b, status="dialing")
-        publish("quote", task_id=tid, vendor=b, price=750, eta="tomorrow 11 am", agreed=True, notes="matched and beat ₹800", budget=800)
+        publish("quote", task_id=tid, vendor=b, price=750, eta="tomorrow 11 am", agreed=True, notes="beat ₹800", budget=800,
+                opening=900, saved=150, all_in=True)
         publish("decision", task_id=tid, mode="agreed", best={"vendor": b, "price": 750, "eta": "tomorrow 11 am", "notes": "matched and beat ₹800"},
                 backup={"vendor": a, "price": 800, "eta": "tomorrow 9 am", "notes": "came down from 1,100"})
         publish("callback", task_id=tid, to="Priya", status="dialing")
         publish("booked", task_id=tid, vendor=b, price=750, eta="tomorrow 11 am", name="Priya")
+        publish("confirm_call", task_id=tid, vendor=b, to=b, status="dialing")
+        publish("locked", task_id=tid, vendor=b, price=750)
     return {"ok": True}
 
 

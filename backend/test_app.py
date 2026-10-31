@@ -252,3 +252,37 @@ def test_vendor_calls_go_multilingual_and_fall_back_if_refused(monkeypatch):
     monkeypatch.setattr(m.httpx, "post", post)
     assert m.dispatch("vendor_call", "A", "+919000000001", "p", "g", {}, senses=m.MULTILINGUAL) == "c1"
     assert sent[0]["ears"]["stt"]["primary"]["model"] == "saaras:v3" and sent[1] is None
+
+
+def test_savings_and_all_in_are_recorded_and_all_in_wins_a_tie():
+    t = task(budget="1000")["task_id"]
+    m.quote_in(t, "A", "800", opening="1100", all_in="no")
+    m.quote_in(t, "B", "800", opening="900", all_in="yes")
+    a, b = m.TASKS[t]["quotes"]["A"], m.TASKS[t]["quotes"]["B"]
+    assert (a["saved"], a["all_in"], b["saved"], b["all_in"]) == (300, False, 100, True)
+    assert m.decide(m.TASKS[t])["best"]["vendor"] == "B"  # same price, but nothing on top
+
+
+def test_counter_offer_goes_back_once_to_the_closest_vendor():
+    t = task(budget="800")["task_id"]
+    m.quote_in(t, "A", "1200")
+    m.quote_in(t, "B", "1000")
+    m.TASKS[t]["called_back"] = True
+    m.counter_round(t, 900)
+    task_ = m.TASKS[t]
+    assert (task_["counter"], task_["budget"], task_["called_back"], [v["name"] for v in task_["pending"]]) == (900, 900, False, ["B"])
+    task_["called_back"] = True
+    m.counter_round(t, 850)  # only one counter round
+    assert task_["counter"] == 900
+
+
+def test_confirmation_call_locks_the_price():
+    m.TASKS.clear()
+    m.PLACED.clear()
+    t = task()["task_id"]
+    m.quote_in(t, "A", 700)
+    m.book(t, "A")
+    m.PLACED["cf-1"] = {"kind": "confirm_call", "task_id": t, "vendor": "A"}
+    m.handle({"call_id": "cf-1", "call_status": "Completed", "post_processing_status": "completed",
+              "call_entity": {"price_confirmed": "yes"}})
+    assert m.EVENTS[-1]["type"] == "locked" and m.EVENTS[-1]["price"] == 700

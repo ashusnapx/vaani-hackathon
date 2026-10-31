@@ -5,6 +5,7 @@ import Link from "next/link";
 import BeforeAfter from "./before-after";
 import Board from "./board";
 import CallMe from "./call-me";
+import Features from "./features";
 import HeroArt from "./hero-art";
 import Services from "./services";
 import { PencilRing } from "./sketch";
@@ -85,6 +86,8 @@ export default function Home() {
         </ol>
 
         <BeforeAfter />
+
+        <Features />
 
         <Services />
 

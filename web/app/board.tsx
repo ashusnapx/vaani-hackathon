@@ -84,6 +84,9 @@ function Lane({ name, call, quote, booked, rank }: { name: string; call?: Ev; qu
               <p ref={priceRef} className="font-serif text-5xl tabular-nums">{priced(quote)}</p>
               <div className="text-sm">
                 <p>{s(quote.eta)}</p>
+                {Number(quote.saved) > 0 ? (
+                  <p className="text-safe">started at {inr(quote.opening)}, saved {inr(quote.saved)}</p>
+                ) : null}
                 {quote.notes ? <p className="text-muted">{s(quote.notes)}</p> : null}
               </div>
             </>
@@ -100,6 +103,8 @@ function Lane({ name, call, quote, booked, rank }: { name: string; call?: Ev; qu
             : quote.maybe ? <Stamp label="Could fit" tone="text-pending" on={quote} />
             : <Stamp label="Over budget" tone="text-scam" on={quote} />
         ) : null}
+        {quote && price && quote.all_in === true ? <Stamp label="All-in" tone="text-safe" on={quote} /> : null}
+        {quote && price && quote.all_in === false ? <Stamp label="Extras on top" tone="text-pending" on={quote} /> : null}
         {rank && <Stamp label={rank} tone="text-family" on={rank} />}
         {booked && <Stamp label="Booked" tone="text-safe" on={booked} />}
       </div>
@@ -119,6 +124,9 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
   const callback = last("callback");
   const booked = last("booked");
   const confirm = last("confirm_call");
+  const counter = last("counter");
+  const locked = last("locked");
+  const saved = mine.filter((e) => e.type === "quote").reduce((a, e) => Math.max(a, Number(e.saved) || 0), 0);
   const dialed = new Set(mine.filter((e) => e.type === "vendor_call" || e.type === "quote").map((e) => String(e.vendor)));
   const shown = vendors.filter((v) => dialed.has(v)).length ? vendors.filter((v) => dialed.has(v)) : vendors.slice(0, 2);
 
@@ -134,6 +142,7 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
           <p className="mt-1 text-lg">
             {s(task.details)} · {s(task.area)} · {s(task.when)}
           </p>
+          {saved > 0 && <p className="mt-1 font-semibold text-safe">Sorted bargained {inr(saved)} off</p>}
         </div>
         <div className="text-right">
           <p className="label text-[0.7rem] text-muted">Budget</p>
@@ -157,6 +166,11 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
         <p key={w.id} className="mt-3 text-sm text-muted">{s(w.note)}</p>
       ))}
 
+      {counter && (
+        <p className="mt-4 rounded-2xl border border-line bg-surface/70 px-5 py-3">
+          {s(task.name)} countered at <span className="font-semibold">{inr(counter.offer)}</span>. Sorted is taking it back to {s(counter.vendor)}.
+        </p>
+      )}
       {decision && (
         <div className="mt-6 rounded-2xl border border-line bg-surface/70 p-5">
           <p className="font-semibold">
@@ -177,6 +191,7 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
             </p>
           )}
           {confirm?.live_captions_url ? <Captions url={String(confirm.live_captions_url)} who={s(booked?.vendor)} /> : null}
+          {locked && <span className="mt-3 inline-block"><Stamp label="Price locked on record" tone="text-safe" on={locked} /></span>}
         </div>
       )}
     </article>
