@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRightIcon as ArrowRight, CalendarXIcon as CalendarX, ChatCircleDotsIcon as ChatCircleDots, CheckCircleIcon as CheckCircle, HandshakeIcon as Handshake, LockIcon as Lock, PhoneCallIcon as PhoneCall, PhoneIncomingIcon as PhoneIncoming, PhoneOutgoingIcon as PhoneOutgoing, ScalesIcon as Scales, StarIcon as Star } from "@phosphor-icons/react";
+import Image from "next/image";
 import Link from "next/link";
 import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { type Ev, type Row, Detail, dur, inr, s, when } from "../../call-detail";
@@ -89,7 +90,8 @@ function journey(id: string, events: Ev[], row?: Row, rows: Row[] = []) {
   if (change?.type === "cancelled") for (const st of steps) if (st.state === "waiting") st.state = "skipped";
   const quotes = vendors.map((v) => last("quote", v)).filter((q): q is Ev => !!q && Number(q.price) > 0);
   const status = change?.type === "cancelled" ? "Cancelled" : rated ? "Done" : booked ? "Booked" : decision ? "Calling back" : "Finding people";
-  return { task, steps, quotes, status, calls: steps.map((st) => st.call).filter((c): c is string => !!c) };
+  return { task, steps, quotes, status, booked: booked?.vendor ? String(booked.vendor) : "",
+    calls: steps.map((st) => st.call).filter((c): c is string => !!c) };
 }
 
 function Graph({ steps, current }: { steps: Step[]; current: string }) {
@@ -160,6 +162,106 @@ function PriceChart({ quotes, budget }: { quotes: Ev[]; budget: number }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+/** The first few lines of a call, as said. */
+function lines(text: unknown, n = 3) {
+  return String(text ?? "")
+    .split(/\n+/)
+    .map((l) => l.match(/^\s*(?:\[[^\]]+\])?\s*(AGENT|USER)?:?\s*(.*)$/i))
+    .filter((m): m is RegExpMatchArray => !!m && !!m[2]?.trim())
+    .slice(0, n)
+    .map((m) => ({ agent: (m[1] ?? "").toUpperCase() === "AGENT", text: m[2].length > 110 ? `${m[2].slice(0, 110)}…` : m[2] }));
+}
+
+type Lane = { key: string; name: string; role: string };
+
+/** Who talked to whom, in order: one lifeline per person, one arrow per call. */
+function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: Row[]; task: Ev; current: string; booked: string }) {
+  const [open, setOpen] = useState<string | null>(current);
+  const calls = steps.filter((st) => st.call);
+  const vendorNames = [...new Set(calls.filter((st) => st.key.startsWith("v-") || st.key === "locked").map((st) => (st.key === "locked" ? "" : st.title)).filter(Boolean))];
+  const lanes: Lane[] = [
+    { key: "customer", name: s(task.name), role: "Customer" },
+    { key: "sorted", name: "Sorted", role: "Vaani agent" },
+    ...vendorNames.map((v) => ({ key: `v-${v}`, name: v, role: "Service person" })),
+  ];
+  const at = (key: string) => lanes.findIndex((l) => l.key === key);
+  const center = (i: number) => ((i + 0.5) / lanes.length) * 100;
+
+  return (
+    <section className="mt-6 rounded-3xl border border-line bg-paper/80 p-6">
+      <h2 className="font-serif text-3xl">Who talked to whom</h2>
+      <p className="mt-1 text-sm text-muted">Every call in this request, in order. Open any call for its recording and full transcript.</p>
+
+      <div className="relative mt-8 overflow-x-auto" data-lenis-prevent>
+        <div className="relative min-w-[36rem]">
+          {/* lifelines */}
+          {lanes.map((l, i) => (
+            <span key={l.key} className="pointer-events-none absolute top-16 bottom-0 border-l-2 border-dashed border-line-strong" style={{ left: `${center(i)}%` }} aria-hidden />
+          ))}
+          {/* people */}
+          <div className="relative grid" style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))` }}>
+            {lanes.map((l) => (
+              <div key={l.key} className="flex flex-col items-center text-center">
+                {l.key === "sorted" ? (
+                  <span className="grid size-12 place-items-center rounded-full border border-line bg-paper"><Image src="/vaani-logo.png" alt="" width={30} height={27} /></span>
+                ) : (
+                  <span className={`grid size-12 place-items-center rounded-full font-serif text-xl ${l.key === "customer" ? "pill-dark" : "bg-surface-2 text-ink"}`}>{l.name.slice(0, 1)}</span>
+                )}
+                <p className="mt-1 text-sm font-semibold">{l.name}</p>
+                <p className="text-xs text-muted">{l.role}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* calls */}
+          <ol className="relative mt-6 space-y-8 pb-2">
+            {calls.map((st, n) => {
+              const r = rows.find((x) => x.call_id === st.call);
+              const person = st.key === "intake" || st.key === "callback" || st.key === "rated" ? "customer" : st.key === "locked" ? `v-${booked}` : st.key;
+              const outbound = st.key !== "intake" || String(r?.direction ?? r?.call_type ?? "").toLowerCase().includes("out");
+              const from = at(outbound ? "sorted" : person), to = at(outbound ? person : "sorted");
+              const left = center(Math.min(from, to)), width = Math.abs(center(to) - center(from));
+              const said = lines(r?.call_transcription);
+              return (
+                <li key={st.key} id={`call-${st.call}`} className="relative scroll-mt-6">
+                  {/* the arrow */}
+                  <div className="relative h-14">
+                    <p className="absolute top-0 text-center text-xs text-muted" style={{ left: `${left}%`, width: `${width}%` }}>
+                      <span className="font-semibold text-ink">Call {n + 1}</span> · {st.title}{r ? ` · ${dur(r.duration_ms)}` : ""}
+                    </p>
+                    <span className={`absolute top-7 h-0.5 ${st.call === current ? "bg-bronze" : "bg-ink"}`} style={{ left: `${left}%`, width: `${width}%` }} aria-hidden />
+                    <span className={`absolute top-[1.45rem] size-0 border-y-[6px] border-y-transparent ${to > from ? "border-l-[10px] border-l-ink" : "border-r-[10px] border-r-ink"}`}
+                      style={{ left: to > from ? `calc(${center(to)}% - 10px)` : `${center(to)}%` }} aria-hidden />
+                    {st.caption ? (
+                      <p className="absolute top-9 text-center text-sm font-semibold" style={{ left: `${left}%`, width: `${width}%` }}>{st.caption}</p>
+                    ) : null}
+                  </div>
+                  {/* what was said, then the whole call on demand */}
+                  <div className="mx-auto mt-3 max-w-2xl rounded-2xl border border-line bg-paper p-4">
+                    {said.length ? (
+                      <ol className="space-y-1.5 text-sm">
+                        {said.map((l, i) => (
+                          <li key={i} className={`max-w-[85%] rounded-2xl px-3 py-1.5 ${l.agent ? "bg-surface" : "ml-auto bg-ink text-paper"}`}>{l.text}</li>
+                        ))}
+                      </ol>
+                    ) : <p className="text-sm text-muted">{r ? "No transcript yet." : "Vaani hasn't listed this call yet."}</p>}
+                    {r && (
+                      <button onClick={() => setOpen(open === st.call ? null : st.call!)} className="mt-3 text-sm font-semibold underline underline-offset-2 hover:text-bronze">
+                        {open === st.call ? "Hide the full call" : "Full call: recording, transcript, data"}
+                      </button>
+                    )}
+                    {r && open === st.call && <div className="mt-4 border-t border-line pt-4"><Detail r={r} /></div>}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </div>
     </section>
   );
 }
@@ -245,17 +347,13 @@ export default function Journey({ id }: { id: string }) {
 
       {j && j.quotes.length > 0 && <div className="mt-6"><PriceChart quotes={j.quotes} budget={Number(j.task.budget)} /></div>}
 
-      {(j ? j.steps.filter((st) => st.call) : row ? [{ key: "only", title: "This call", call: id } as Step] : []).map((st) => {
-        const r = rows.find((x) => x.call_id === st.call);
-        return (
-          <section key={st.key} id={`call-${st.call}`}
-            className={`mt-6 scroll-mt-6 rounded-3xl border bg-paper/80 p-6 ${st.call === id ? "border-bronze/60" : "border-line"}`}>
-            <h2 className="mb-4 font-serif text-2xl">{st.title}</h2>
-            {r ? <Detail r={r} /> : <p className="text-muted">{loaded ? "Vaani hasn't listed this call yet. It appears a few seconds after the call starts." : "Loading the call…"}</p>}
-          </section>
-        );
-      })}
-      {!j && !row && loaded && <p className="mt-6 text-muted">Vaani hasn&rsquo;t listed this call yet.</p>}
+      {j ? (
+        <Thread steps={j.steps} rows={rows} task={j.task} current={id} booked={j.booked} />
+      ) : (
+        <section id={`call-${id}`} className="mt-6 rounded-3xl border border-line bg-paper/80 p-6">
+          {row ? <Detail r={row} /> : <p className="text-muted">{loaded ? "Vaani hasn't listed this call yet." : "Loading the call…"}</p>}
+        </section>
+      )}
 
       {related.length > 1 && (
         <p className="mt-6 text-sm text-muted">
