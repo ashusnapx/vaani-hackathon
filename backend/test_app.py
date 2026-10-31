@@ -198,7 +198,7 @@ def test_a_firm_fit_beats_a_cheaper_maybe():
 
 def test_vendor_never_hears_the_budget():
     calls, real = [], m.dispatch
-    m.dispatch = lambda kind, name, phone, prompt, greeting, tag, analysis=None, senses=None: calls.append(prompt + greeting) or None
+    m.dispatch = lambda kind, name, phone, prompt, greeting, tag, analysis=None, senses=None, lang="en": calls.append(prompt + greeting) or None
     try:
         m.TASKS.clear()
         m.start_task({"name": "Priya", "phone": "9876543210", "service": "AC repair", "details": "AC not cooling",
@@ -341,7 +341,7 @@ def test_editing_a_vendor_can_keep_the_number_on_file():
 
 def test_website_caller_is_only_asked_what_the_form_did_not_give(monkeypatch):
     sent = []
-    monkeypatch.setattr(m, "dispatch", lambda kind, name, phone, prompt, greeting, tag, analysis=None, senses=None: sent.append((prompt, greeting, tag)) or "c-web")
+    monkeypatch.setattr(m, "dispatch", lambda kind, name, phone, prompt, greeting, tag, analysis=None, senses=None, lang="en": sent.append((prompt, greeting, tag)) or "c-web")
     q = {"key": "k"}
     assert c.post("/actions/call-me", params=q, json={"name": "Priya", "phone": "98765 43210"}).json()["ok"]
     prompt, greeting, tag = sent[-1]
@@ -354,3 +354,27 @@ def test_website_caller_is_only_asked_what_the_form_did_not_give(monkeypatch):
     m.handle({"call_id": "c-web", "call_status": "Completed", "post_processing_status": "completed",
               "call_entity": {"service": "AC repair", "details": "not cooling", "budget": "800", "address": "Koramangala"}})
     assert next(iter(m.TASKS.values()))["name"] == "Priya"
+
+
+def test_customer_language_is_used_for_their_calls(monkeypatch):
+    sent = []
+    monkeypatch.setattr(m, "dispatch", lambda kind, name, phone, prompt, greeting, tag, analysis=None, senses=None, lang="en": sent.append((kind, tag, lang)) or "c-kn")
+    q = {"key": "k"}
+    assert c.post("/actions/call-me", params=q, json={"name": "Asha", "phone": "9876543210", "language": "xx"}).status_code == 422
+    assert c.post("/actions/call-me", params=q, json={"name": "Asha", "phone": "9876543210", "language": "kn"}).json()["ok"]
+    assert sent[-1] == ("intake_call", {"phone": "+919876543210", "name": "Asha", "language": "kn"}, "kn")
+    m.TASKS.clear()
+    m.PLACED["c-kn"] = {"kind": "intake_call", "phone": "+919876543210", "name": "Asha", "language": "kn"}
+    m.handle({"call_id": "c-kn", "call_status": "Completed", "post_processing_status": "completed",
+              "call_entity": {"service": "plumber", "details": "tap leaking", "budget": "500"}})
+    t = next(iter(m.TASKS))
+    m.TASKS[t]["in_wave"] = ["C"]
+    m.quote_in(t, "C", 400)
+    m.call_back(t)
+    assert sent[-1][0] == "callback" and sent[-1][2] == "kn"
+
+
+def test_speaker_sets_one_language_for_ears_and_voice():
+    s = m.speaker("ta")
+    assert s["language"] == "ta" and s["mouth"]["tts"]["primary"]["config"]["language"] == "ta"
+    assert m.MULTILINGUAL["mouth"]["tts"]["primary"]["config"]["language"] == "hi"  # the shared default is untouched

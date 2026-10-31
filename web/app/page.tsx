@@ -53,16 +53,11 @@ export default function Home() {
               <br />
               and it&rsquo;s <PencilRing paths={RING}><em className="text-bronze">sorted.</em></PencilRing>
             </h1>
-            <p className="mt-8 max-w-[34rem] text-lg leading-relaxed text-muted">
-              The plumber, the AC mechanic and the electrician down the road have no app and no
-              website. They have a phone. Tell Sorted the job and your price once, and it rings them
-              for you, bargains, and calls you back with whoever said yes.
-            </p>
-            <p className="mt-3 text-sm text-muted">Your number and address go only to the one person you choose.</p>
+            <p className="mt-6 text-xl text-muted">You call once. We ring the repairmen and haggle.</p>
 
-            <div className="relative mt-12 max-w-[34rem]">
+            <div className="relative mt-10 max-w-[34rem]">
               <div className="pointer-events-none absolute -top-11 right-2 flex items-end gap-1 text-bronze" aria-hidden>
-                <span className="font-serif text-xl italic">try it, your phone rings</span>
+                <span className="font-serif text-xl italic">try it</span>
                 <svg width="44" height="40" viewBox="0 0 44 40" fill="none" className="translate-y-5">
                   <path d="M40 4 C 30 6, 18 14, 14 32" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   <path d="M8 26 L14 33 L20 27" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />

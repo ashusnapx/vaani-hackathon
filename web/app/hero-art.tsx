@@ -82,7 +82,7 @@ export default function HeroArt() {
 
       {/* the callback */}
       <p data-callback className="absolute bottom-[1%] left-[30%] font-serif text-lg text-safe italic">
-        &ldquo;Cool Care, ₹750, kal 11 baje. Book karun?&rdquo;
+        &ldquo;Cool Care, ₹750, tomorrow at 11. Shall I book?&rdquo;
       </p>
     </div>
   );

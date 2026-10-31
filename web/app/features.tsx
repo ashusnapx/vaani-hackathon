@@ -8,7 +8,7 @@ const FEATURES = [
   [IndianRupee, "Understands any price", "₹800, 800 to 1,000, visit plus parts, per hour, 1.5k. All compared fairly."],
   [Receipt, "Asks if it's all-in", "Visit charge and parts, said out loud. No surprises at the door."],
   [Repeat2, "Counter-offers for you", "Nobody fits? Name your price and Sorted goes back once more."],
-  [Languages, "Speaks the mechanic's language", "Kannada, Hindi, Tamil, Telugu or a mix. It follows them."],
+  [Languages, "Your language, and theirs", "Pick from 11 Indian languages for your calls. With mechanics, it follows whatever they speak."],
   [ListChecks, "Best and a backup", "Cheapest firm price wins. Ties go to all-in, verified, better rated, then sooner."],
   [PiggyBank, "Shows what it saved", "From their opening price to the deal, in rupees."],
   [Lock, "Locks the price on record", "The mechanic confirms price and time on a recorded call."],
