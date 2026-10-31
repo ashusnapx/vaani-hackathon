@@ -1,4 +1,4 @@
-import { EyeOff, FileAudio, IndianRupee, Languages, ListChecks, Lock, PiggyBank, Receipt, Repeat2, ShieldCheck, Tags, TrendingDown } from "lucide-react";
+import { BadgeCheck, CalendarClock, EyeOff, FileAudio, IndianRupee, Languages, ListChecks, Lock, PiggyBank, Receipt, Repeat2, ShieldCheck, Star, Tags, TrendingDown } from "lucide-react";
 
 // Everything Sorted actually does today. Add a line here with every new feature.
 const FEATURES = [
@@ -9,10 +9,13 @@ const FEATURES = [
   [Receipt, "Asks if it's all-in", "Visit charge and parts, said out loud. No surprises at the door."],
   [Repeat2, "Counter-offers for you", "Nobody fits? Name your price and Sorted goes back once more."],
   [Languages, "Speaks the mechanic's language", "Kannada, Hindi, Tamil, Telugu or a mix. It follows them."],
-  [ListChecks, "Best and a backup", "Cheapest firm price wins, ties go to all-in, then whoever said yes first."],
+  [ListChecks, "Best and a backup", "Cheapest firm price wins. Ties go to all-in, verified, better rated, then sooner."],
   [PiggyBank, "Shows what it saved", "From their opening price to the deal, in rupees."],
   [Lock, "Locks the price on record", "The mechanic confirms price and time on a recorded call."],
   [ShieldCheck, "Can't be talked round", "Prompt injection, fake staff, abuse and data fishing are refused and flagged."],
+  [BadgeCheck, "Verified service people", "The operator vouches for people they've checked; they win ties."],
+  [Star, "Ratings by phone", "After the job, Sorted rings you for a 1 to 5. Good work gets more calls."],
+  [CalendarClock, "Cancel or move it by voice", "Call back and say so. Sorted stops the search or tells the mechanic."],
   [FileAudio, "Every call on file", "Recording, transcript, summary, quality score and cost for each call."],
 ] as const;
 

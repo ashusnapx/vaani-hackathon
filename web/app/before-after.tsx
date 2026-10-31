@@ -1,5 +1,5 @@
 import { EyeOff, FileAudio, HandCoins, PhoneOutgoing, Repeat } from "lucide-react";
-import { AfterSketch, BeforeSketch } from "./sketch";
+import { AfterSketch, BeforeSketch } from "./sketch-art";
 
 // Product facts for one job with three mechanics, not survey statistics.
 const ROWS = [

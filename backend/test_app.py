@@ -155,7 +155,8 @@ def test_vendors_added_and_removed_from_the_dashboard():
     assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "12345"}).status_code == 422
     assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "+91 99999 88888", "services": ["plumbing", "made_up"]}).json()["ok"]
     listed = c.get("/vendors", params=q).json()
-    assert {"name": "Ravi", "phone_tail": "8888", "services": ["plumbing"]} in listed
+    ravi = next(v for v in listed if v["name"] == "Ravi")
+    assert (ravi["phone_tail"], ravi["services"], ravi["verified"], ravi["rating"]) == ("8888", ["plumbing"], False, None)
     assert "99999" not in str(listed)  # numbers never leave the server in full
     assert c.delete("/vendors/ravi", params=q).json()["ok"]
     assert c.delete("/vendors/ravi", params=q).status_code == 404
@@ -286,3 +287,53 @@ def test_confirmation_call_locks_the_price():
     m.handle({"call_id": "cf-1", "call_status": "Completed", "post_processing_status": "completed",
               "call_entity": {"price_confirmed": "yes"}})
     assert m.EVENTS[-1]["type"] == "locked" and m.EVENTS[-1]["price"] == 700
+
+
+def test_ties_go_to_all_in_then_verified_then_rating_then_sooner():
+    t = task(budget="1000")["task_id"]
+    m.quote_in(t, "A", "800", all_in="yes", arrival="5")
+    m.quote_in(t, "B", "800", all_in="yes", arrival="1")
+    assert m.decide(m.TASKS[t])["best"]["vendor"] == "B"  # same price, sooner
+    m.TASKS[t]["quotes"]["A"]["verified"] = True
+    assert m.decide(m.TASKS[t])["best"]["vendor"] == "A"  # verified beats sooner
+
+
+def test_verify_toggle_and_rating_call_feed_the_vendor_record():
+    q = {"key": "k"}
+    assert c.post("/vendors/A/verify", params=q).json()["verified"] is True
+    m.TASKS.clear()
+    m.PLACED.clear()
+    t = task()["task_id"]
+    m.PLACED["r-1"] = {"kind": "rating_call", "task_id": t, "vendor": "A"}
+    m.handle({"call_id": "r-1", "call_status": "Completed", "post_processing_status": "completed",
+              "call_entity": {"rating": "4", "comment": "quick and tidy"}})
+    m.PLACED["r-2"] = {"kind": "rating_call", "task_id": t, "vendor": "A"}
+    m.handle({"call_id": "r-2", "call_status": "Completed", "post_processing_status": "completed",
+              "call_entity": {"rating": "9"}})  # out of range, ignored
+    assert m.rating_of("A") == 4.0
+    assert c.post("/vendors/A/verify", params=q).json()["verified"] is False
+
+
+def test_cancel_by_voice_stops_the_search():
+    m.TASKS.clear()
+    t = task()["task_id"]
+    m.handle({"call_id": "in-c", "call_status": "Completed", "post_processing_status": "completed",
+              "from_number": "+919876543210", "call_entity": {"intent": "cancel"}})
+    assert m.TASKS[t]["cancelled"] and m.TASKS[t]["pending"] == []
+
+
+def test_reschedule_by_voice_moves_the_time():
+    m.TASKS.clear()
+    t = task()["task_id"]
+    m.change_request("98765 43210", "reschedule", "Sunday 4 pm")
+    assert m.TASKS[t]["when"] == "Sunday 4 pm" and not m.TASKS[t].get("cancelled")
+
+
+def test_editing_a_vendor_can_keep_the_number_on_file():
+    q = {"key": "k"}
+    assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "9999988888", "services": ["plumbing"]}).json()["ok"]
+    assert c.post("/vendors", params=q, json={"name": "ravi", "phone": "", "services": ["electrical"]}).json()["ok"]
+    ravi = next(v for v in c.get("/vendors", params=q).json() if v["name"].lower() == "ravi")
+    assert (ravi["phone_tail"], ravi["services"]) == ("8888", ["electrical"])
+    assert c.post("/vendors", params=q, json={"name": "Newbie", "phone": ""}).status_code == 422
+    c.delete("/vendors/ravi", params=q)

@@ -3,12 +3,12 @@ import { HandCoins, PhoneIncoming, PhoneOutgoing } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import BeforeAfter from "./before-after";
-import Board from "./board";
 import CallMe from "./call-me";
 import Features from "./features";
 import HeroArt from "./hero-art";
 import Services from "./services";
 import { PencilRing } from "./sketch";
+import { RING } from "./sketch-art";
 
 const number = process.env.NEXT_PUBLIC_SORTED_NUMBER || "+91 80642 79097";
 
@@ -39,6 +39,7 @@ export default function Home() {
           </p>
           <div className="flex items-center gap-5">
             <Link href="/dashboard" className="text-sm text-muted hover:text-ink">Dashboard</Link>
+            <Link href="/service-people" className="hidden text-sm text-muted hover:text-ink sm:inline">Service people</Link>
             <a href={`tel:${number.replace(/\s/g, "")}`} className="pill-dark rounded-full px-4 py-2 text-sm font-semibold tabular-nums">
               Call {number}
             </a>
@@ -50,7 +51,7 @@ export default function Home() {
             <h1 className="font-serif text-[clamp(3rem,7vw,5.75rem)] leading-[0.92] tracking-[-0.02em] text-balance">
               One call,
               <br />
-              and it&rsquo;s <PencilRing><em className="text-bronze">sorted.</em></PencilRing>
+              and it&rsquo;s <PencilRing paths={RING}><em className="text-bronze">sorted.</em></PencilRing>
             </h1>
             <p className="mt-8 max-w-[34rem] text-lg leading-relaxed text-muted">
               The plumber, the AC mechanic and the electrician down the road have no app and no
@@ -91,7 +92,6 @@ export default function Home() {
 
         <Services />
 
-        <Board />
 
         <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-line py-8 text-sm text-muted">
           <a

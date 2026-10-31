@@ -19,6 +19,7 @@ export default function DashboardPage() {
         <nav className="flex items-center gap-5 text-sm">
           <Link href="/" className="text-muted hover:text-ink">Home</Link>
           <span className="font-semibold">Dashboard</span>
+          <Link href="/service-people" className="text-muted hover:text-ink">Service people</Link>
         </nav>
       </header>
       <Dashboard />

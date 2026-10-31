@@ -2,7 +2,8 @@
 
 import { ArrowDownLeft, ArrowUpRight, Globe, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Vendors from "./vendors";
+import Board from "../board";
+import Link from "next/link";
 
 type Row = Record<string, unknown> & { call_id: string };
 type Ev = { id: number; type: string; at: number } & Record<string, unknown>;
@@ -198,6 +199,10 @@ const EVENT_TEXT: Record<string, (e: Ev) => string> = {
   locked: (e) => `Price locked with ${s(e.vendor)} at ${inr(e.price)} (recorded)`,
   lock_failed: (e) => `${s(e.vendor)} did not confirm the price`,
   note: (e) => s(e.text),
+  rated: (e) => `${s(e.vendor)} rated ${s(e.rating)}/5 (now ${s(e.average)})${e.comment ? `: "${s(e.comment)}"` : ""}`,
+  cancelled: () => "Customer cancelled by phone",
+  rescheduled: (e) => `Customer moved the job to ${s(e.when)}`,
+  change_unmatched: (e) => `A ${s(e.intent)} call didn't match any request`,
   intake_incomplete: (e) => `Request from ${s(e.name)} missing ${s((e.missing as string[])?.join(", "))}`,
   intake_skipped: (e) => `Request not started: ${s(e.reason)}`,
   declined: () => "Customer didn't pick an option",
@@ -274,6 +279,8 @@ export default function Dashboard() {
         ))}
       </dl>
 
+      <Board showCalls={false} />
+
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <section>
           <div className="flex flex-wrap items-center gap-2">
@@ -315,7 +322,9 @@ export default function Dashboard() {
             </ul>
           )}
 
-          <div className="mt-12"><Vendors /></div>
+          <p className="mt-12 text-sm">
+            <Link href="/service-people" className="underline underline-offset-2 hover:text-bronze">Manage service people →</Link>
+          </p>
 
           <h2 className="mt-12 font-serif text-3xl">Live activity</h2>
           <ol className="mt-3 max-h-96 space-y-1.5 overflow-y-auto text-sm" data-lenis-prevent>

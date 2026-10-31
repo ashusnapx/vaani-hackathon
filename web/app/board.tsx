@@ -83,7 +83,11 @@ function Lane({ name, call, quote, booked, rank }: { name: string; call?: Ev; qu
             <>
               <p ref={priceRef} className="font-serif text-5xl tabular-nums">{priced(quote)}</p>
               <div className="text-sm">
-                <p>{s(quote.eta)}</p>
+                <p>
+                  {s(quote.eta)}
+                  {quote.arrival_hours != null ? <span className="text-muted"> · ~{s(quote.arrival_hours)}h away</span> : null}
+                  {quote.rating ? <span className="text-muted"> · ★ {s(quote.rating)}</span> : null}
+                </p>
                 {Number(quote.saved) > 0 ? (
                   <p className="text-safe">started at {inr(quote.opening)}, saved {inr(quote.saved)}</p>
                 ) : null}
@@ -103,6 +107,7 @@ function Lane({ name, call, quote, booked, rank }: { name: string; call?: Ev; qu
             : quote.maybe ? <Stamp label="Could fit" tone="text-pending" on={quote} />
             : <Stamp label="Over budget" tone="text-scam" on={quote} />
         ) : null}
+        {quote?.verified ? <Stamp label="Verified" tone="text-family" on={quote} /> : null}
         {quote && price && quote.all_in === true ? <Stamp label="All-in" tone="text-safe" on={quote} /> : null}
         {quote && price && quote.all_in === false ? <Stamp label="Extras on top" tone="text-pending" on={quote} /> : null}
         {rank && <Stamp label={rank} tone="text-family" on={rank} />}
@@ -126,6 +131,9 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
   const confirm = last("confirm_call");
   const counter = last("counter");
   const locked = last("locked");
+  const rated = last("rated");
+  const change = mine.find((e) => e.type === "cancelled" || e.type === "rescheduled");
+  const [asked, setAsked] = useState(false);
   const saved = mine.filter((e) => e.type === "quote").reduce((a, e) => Math.max(a, Number(e.saved) || 0), 0);
   const dialed = new Set(mine.filter((e) => e.type === "vendor_call" || e.type === "quote").map((e) => String(e.vendor)));
   const shown = vendors.filter((v) => dialed.has(v)).length ? vendors.filter((v) => dialed.has(v)) : vendors.slice(0, 2);
@@ -166,6 +174,12 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
         <p key={w.id} className="mt-3 text-sm text-muted">{s(w.note)}</p>
       ))}
 
+      {change && (
+        <p className="mt-4 rounded-2xl border border-line bg-surface/70 px-5 py-3">
+          {change.type === "cancelled" ? `${s(task.name)} cancelled by phone.` : `${s(task.name)} moved it to ${s(change.when)}.`}
+          {change.vendor ? ` Sorted is letting ${s(change.vendor)} know.` : " The search was updated."}
+        </p>
+      )}
       {counter && (
         <p className="mt-4 rounded-2xl border border-line bg-surface/70 px-5 py-3">
           {s(task.name)} countered at <span className="font-semibold">{inr(counter.offer)}</span>. Sorted is taking it back to {s(counter.vendor)}.
@@ -192,6 +206,16 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
           )}
           {confirm?.live_captions_url ? <Captions url={String(confirm.live_captions_url)} who={s(booked?.vendor)} /> : null}
           {locked && <span className="mt-3 inline-block"><Stamp label="Price locked on record" tone="text-safe" on={locked} /></span>}
+          {booked && !rated && (
+            <button
+              onClick={() => { setAsked(true); fetch(`/api/rate/${encodeURIComponent(String(task.task_id))}`, { method: "POST" }).catch(() => {}); }}
+              disabled={asked}
+              className="mt-3 ml-3 rounded-full border border-line-strong px-3 py-1 text-sm hover:border-ink disabled:opacity-50"
+            >
+              {asked ? "Calling for a rating…" : `Ask ${s(task.name)} for a rating`}
+            </button>
+          )}
+          {rated && <p className="mt-2 text-sm">{s(task.name)} rated {s(rated.vendor)} ★ {s(rated.rating)}/5{rated.comment ? `: “${s(rated.comment)}”` : ""}</p>}
         </div>
       )}
     </article>
@@ -230,7 +254,7 @@ function EarlierCalls({ calls }: { calls: Call[] }) {
   );
 }
 
-export default function Board() {
+export default function Board({ showCalls = true }: { showCalls?: boolean }) {
   const [events, setEvents] = useState<Ev[]>([]);
   const [calls, setCalls] = useState<Call[]>([]);
   const [live, setLive] = useState<boolean | null>(null);
@@ -305,7 +329,7 @@ export default function Board() {
         </p>
       </section>
 
-      <EarlierCalls calls={calls} />
+      {showCalls && <EarlierCalls calls={calls} />}
     </>
   );
 }

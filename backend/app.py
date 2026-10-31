@@ -62,6 +62,15 @@ def categorize(*texts, said: str = "") -> str:
     return next((cid for cid, (_, pattern) in CATEGORIES.items() if re.search(pattern, text)), "other")
 
 
+def vendor_of(name: str) -> dict:
+    return next((v for v in VENDORS if v["name"] == name), {})
+
+
+def rating_of(name: str) -> float | None:
+    r = vendor_of(name).get("ratings") or []
+    return round(sum(r) / len(r), 1) if r else None
+
+
 def save_vendors() -> None:
     with open(VENDORS_FILE, "w") as f:
         json.dump(VENDORS, f, indent=1)
@@ -250,7 +259,12 @@ VENDOR_FIELDS = extract(
     ("opening_price", "The first price they said, before any bargaining, in rupees as digits only.", None),
     ("all_inclusive", "Does their final price include the visit charge and parts?", ["yes", "no", "unclear"]),
     ("eta", "When they said they can come.", None),
+    ("arrival_hours", "Roughly how many hours from now they can arrive, as a number only.", None),
     ("notes", "Anything important: what is extra (parts, gas), why they declined.", None),
+)
+RATING_FIELDS = extract(
+    ("rating", "The customer's rating of the service person from 1 to 5, as a digit only.", ["1", "2", "3", "4", "5"]),
+    ("comment", "Anything the customer said about the work.", None),
 )
 CALLBACK_FIELDS = extract(
     ("chosen_vendor", "Exact name of the service person the customer chose to book, if any.", None),
@@ -319,6 +333,8 @@ def best_so_far(t: dict) -> dict | None:
 
 
 def ring_next(task_id: str) -> None:
+    if TASKS[task_id].get("cancelled"):
+        return
     with LOCK:
         t = TASKS[task_id]
         wave = t["pending"][:WAVE_SIZE]
@@ -373,7 +389,7 @@ OPEN_ENDED = ("visit_plus_parts", "per_hour", "after_inspection")
 
 
 def quote_in(task_id: str, vendor: str, low, high=None, eta: str = "", notes: str = "", basis: str = "",
-             opening=None, all_in=None) -> None:
+             opening=None, all_in=None, arrival=None) -> None:
     """A vendor's final answer. Whether it fits is decided by the numbers, never by anyone's say-so.
 
     A fixed price fits when it is within budget. A range fits only when its top is; a range whose
@@ -398,10 +414,12 @@ def quote_in(task_id: str, vendor: str, low, high=None, eta: str = "", notes: st
              "basis": basis or "fixed", "eta": clean(eta, 60), "agreed": agreed, "maybe": maybe,
              "notes": clean(notes, 100), "at": time.time(),
              "opening": started, "saved": max(0, started - final) if final else 0,
-             "all_in": None if all_in in (None, "", "unclear") else yes(all_in)}
+             "all_in": None if all_in in (None, "", "unclear") else yes(all_in),
+             "arrival_hours": (amounts(arrival) or [None])[0],
+             "verified": vendor_of(vendor).get("verified", False), "rating": rating_of(vendor)}
     publish("quote", task_id=task_id, budget=budget, round=t.get("rounds", 1), **{k: quote[k] for k in
             ("vendor", "price", "price_max", "open", "basis", "eta", "agreed", "maybe", "notes",
-             "opening", "saved", "all_in")})
+             "opening", "saved", "all_in", "arrival_hours", "verified", "rating")})
     with LOCK:
         t["quotes"][vendor] = quote
         done = all(name in t["quotes"] for name in t["in_wave"])
@@ -429,6 +447,13 @@ def close_wave(task_id: str, n: int) -> None:
         later(3, ring_next, task_id)
 
 
+def rank(q: dict) -> tuple:
+    """Price first. On a tie: all-in, then verified, then better rated, then sooner, then who said yes first."""
+    arrival = q.get("arrival_hours")
+    return (cost(q), q.get("all_in") is not True, not q.get("verified"), -(q.get("rating") or 0),
+            arrival if arrival is not None else 1e9, q["at"])
+
+
 def decide(t: dict) -> dict:
     """Lowest worst-case price that fits wins; ties go to whoever answered first; runner-up is backup.
 
@@ -436,7 +461,7 @@ def decide(t: dict) -> dict:
     offered as such. Failing that, the closest offer over budget. Failing that, nothing.
     """
     priced = [q for q in t["quotes"].values() if q["price"]]
-    agreed = sorted((q for q in priced if q["agreed"]), key=lambda q: (cost(q), q.get("all_in") is not True, q["at"]))
+    agreed = sorted((q for q in priced if q["agreed"]), key=rank)
     if agreed:
         return {"mode": "agreed", "best": agreed[0], "backup": agreed[1] if len(agreed) > 1 else None}
     maybe = sorted((q for q in priced if q.get("maybe")), key=lambda q: (q["price"], q["at"]))
@@ -454,7 +479,7 @@ def phone_of(vendor: str) -> str:
 def call_back(task_id: str) -> None:
     with LOCK:
         t = TASKS[task_id]
-        if t["called_back"]:
+        if t["called_back"] or t.get("cancelled"):
             return
         t["called_back"] = True
     d = decide(t)
@@ -550,6 +575,32 @@ def counter_round(task_id: str, offer: int) -> None:
     later(8, ring_next, task_id)
 
 
+def change_request(phone, intent: str, new_time=None) -> None:
+    """A customer called to cancel or move their latest job. Stop the search, or tell the booked vendor."""
+    mine = [(tid, t) for tid, t in TASKS.items() if digits(t["phone"]) == digits(phone) and not t.get("cancelled")]
+    if not mine:
+        publish("change_unmatched", intent=intent)
+        return
+    task_id, t = mine[-1]
+    when = clean(new_time, 60)
+    if intent == "cancel":
+        t.update(cancelled=True, pending=[])
+    elif when:
+        t["when"] = when
+    publish("cancelled" if intent == "cancel" else "rescheduled", task_id=task_id, when=when, vendor=t.get("booked"))
+    if t.get("booked"):
+        news = "the customer has cancelled this job" if intent == "cancel" else f"the customer has moved it to {when}"
+        prompt = (
+            "You are Sorted, calling a service person about a booking they accepted."
+            + fence(service_person=t["booked"], job=t["service"], change=news)
+            + "Tell them the change in one or two sentences, apologise for any trouble if it is a cancellation, "
+            "and for a new time ask if it works for them. Thank them and end the call."
+        )
+        greeting = f"Hello, Sorted here about the {clean(t['service'], 40)} job. There's a change from the customer."
+        dispatch("change_call", t["booked"], phone_of(t["booked"]), prompt, greeting,
+                 {"task_id": task_id, "vendor": t["booked"]}, senses=MULTILINGUAL)
+
+
 def match_vendor(t: dict, said) -> str | None:
     said = clean(said, 60).lower()
     names = [q["vendor"] for q in t["quotes"].values() if q["price"]]
@@ -582,6 +633,10 @@ def handle(row: dict) -> bool:
             publish("intake_skipped", call_id=call_id, reason="emergency or abuse")
             return True
         phone = e.get("callback_number") or placed.get("phone") or row.get("from_number")
+        intent = str(e.get("intent") or "").lower()
+        if intent in ("cancel", "reschedule"):
+            change_request(phone, intent, e.get("new_time"))
+            return True
         res = start_task({"name": e.get("customer_name"), "phone": phone, "address": e.get("address"),
                           "area": e.get("area"), "service": e.get("service"), "details": e.get("details"),
                           "when": e.get("when"), "budget": e.get("budget"), "category": e.get("category")})
@@ -592,7 +647,7 @@ def handle(row: dict) -> bool:
         quote_in(placed["task_id"], placed["vendor"], e.get("price_min") if ok else 0,
                  e.get("price_max") if ok else None, e.get("eta") or "",
                  e.get("notes") or ("" if ok else "declined"), e.get("pricing_basis") or "",
-                 e.get("opening_price"), e.get("all_inclusive"))
+                 e.get("opening_price"), e.get("all_inclusive"), e.get("arrival_hours"))
     elif kind == "callback":
         t = TASKS.get(placed["task_id"])
         vendor = match_vendor(t, e.get("chosen_vendor")) if t and yes(e.get("confirmed")) else None
@@ -603,6 +658,14 @@ def handle(row: dict) -> bool:
             counter_round(placed["task_id"], offer)
         else:
             publish("declined", task_id=placed["task_id"], said=clean(e.get("chosen_vendor"), 60))
+    elif kind == "rating_call":
+        score = rupees(e.get("rating"))
+        v = vendor_of(placed.get("vendor", ""))
+        if v and 1 <= score <= 5:
+            v.setdefault("ratings", []).append(score)
+            save_vendors()
+            publish("rated", task_id=placed["task_id"], vendor=v["name"], rating=score,
+                    average=rating_of(v["name"]), comment=clean(e.get("comment"), 120))
     elif kind == "confirm_call":
         t = TASKS.get(placed["task_id"])
         q = (t or {}).get("quotes", {}).get(placed.get("vendor"), {})
@@ -777,7 +840,8 @@ def categories(key: str | None = Query(None)):
 @app.get("/vendors")
 def list_vendors(key: str | None = Query(None)):
     authorised(key)
-    return [{"name": v["name"], "phone_tail": digits(v["phone"])[-4:], "services": v.get("services") or ["*"]}
+    return [{"name": v["name"], "phone_tail": digits(v["phone"])[-4:], "services": v.get("services") or ["*"],
+             "verified": v.get("verified", False), "rating": rating_of(v["name"]), "ratings": len(v.get("ratings") or [])}
             for v in VENDORS]
 
 
@@ -787,14 +851,48 @@ def add_vendor(body: VendorIn, key: str | None = Query(None)):
     name = clean(body.name, 40)
     if not name:
         raise HTTPException(status_code=422, detail="Give the service person a name")
-    if len(digits(body.phone)) != 10:
+    old = next((v for v in VENDORS if v["name"].lower() == name.lower()), {})
+    phone = digits(body.phone) or digits(old.get("phone"))  # editing may keep the number on file
+    if len(phone) != 10:
         raise HTTPException(status_code=422, detail="Enter a 10-digit Indian mobile number")
     services = [x for x in body.services if x == "*" or x in CATEGORIES] or ["*"]
     VENDORS[:] = [v for v in VENDORS if v["name"].lower() != name.lower()]
-    VENDORS.append({"name": name, "phone": "+91" + digits(body.phone), "services": services})
+    VENDORS.append({"name": name, "phone": "+91" + phone, "services": services,
+                    "verified": old.get("verified", False), "ratings": old.get("ratings", [])})
     save_vendors()
     publish("vendor_added", vendor=name, services=services)
     return {"ok": True, "count": len(VENDORS)}
+
+
+@app.post("/vendors/{name}/verify")
+def verify_vendor(name: str, key: str | None = Query(None)):
+    """The operator vouches for a service person, after checking their ID and work."""
+    authorised(key)
+    v = next((v for v in VENDORS if v["name"].lower() == name.lower()), None)
+    if not v:
+        raise HTTPException(status_code=404, detail="No such service person")
+    v["verified"] = not v.get("verified", False)
+    save_vendors()
+    return {"ok": True, "verified": v["verified"]}
+
+
+@app.post("/actions/rate/{task_id}")
+def ask_rating(task_id: str, key: str | None = Query(None)):
+    """After the job: ring the customer for a 1-5 rating of the service person they booked."""
+    authorised(key)
+    t = TASKS.get(task_id)
+    if not t or not t.get("booked"):
+        raise HTTPException(status_code=404, detail="No booked job with that id")
+    prompt = (
+        "You are Sorted, calling a customer to ask how their job went."
+        + fence(customer=t["name"], job=t["service"], service_person=t["booked"])
+        + "Ask whether the work is done, then ask them to rate the service person from one to five. If they "
+        "give a reason, listen and thank them. Keep it to under a minute, then close warmly."
+    )
+    greeting = f"Hi {clean(t['name'], 40)}, this is Sorted. Quick one: how did the {clean(t['service'], 40)} job go?"
+    dispatch("rating_call", t["name"], t["phone"], prompt, greeting,
+             {"task_id": task_id, "vendor": t["booked"]}, RATING_FIELDS)
+    return {"ok": True}
 
 
 @app.delete("/vendors/{name}")
