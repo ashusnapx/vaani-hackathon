@@ -7,6 +7,7 @@ import Board from "./board";
 import CallMe from "./call-me";
 import HeroArt from "./hero-art";
 import Services from "./services";
+import { PencilRing } from "./sketch";
 
 const number = process.env.NEXT_PUBLIC_SORTED_NUMBER || "+91 80642 79097";
 
@@ -48,7 +49,7 @@ export default function Home() {
             <h1 className="font-serif text-[clamp(3rem,7vw,5.75rem)] leading-[0.92] tracking-[-0.02em] text-balance">
               One call,
               <br />
-              and it&rsquo;s <em className="text-bronze">sorted.</em>
+              and it&rsquo;s <PencilRing><em className="text-bronze">sorted.</em></PencilRing>
             </h1>
             <p className="mt-8 max-w-[34rem] text-lg leading-relaxed text-muted">
               The plumber, the AC mechanic and the electrician down the road have no app and no

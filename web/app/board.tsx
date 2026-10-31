@@ -127,7 +127,10 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted tabular-nums">{clock(task.at)} · {s(task.name)} called</p>
-          <h3 className="mt-1 font-serif text-4xl">{s(task.service)}</h3>
+          <h3 className="mt-1 flex flex-wrap items-baseline gap-3 font-serif text-4xl">
+            {s(task.service)}
+            {task.category_label ? <span className="label rounded-full border border-bronze/50 px-2 py-0.5 font-sans text-[0.7rem] text-bronze">{s(task.category_label)}</span> : null}
+          </h3>
           <p className="mt-1 text-lg">
             {s(task.details)} · {s(task.area)} · {s(task.when)}
           </p>

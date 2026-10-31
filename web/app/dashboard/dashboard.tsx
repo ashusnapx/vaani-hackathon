@@ -183,7 +183,7 @@ function Detail({ r }: { r: Row }) {
 }
 
 const EVENT_TEXT: Record<string, (e: Ev) => string> = {
-  task: (e) => `${s(e.name)} asked for ${s(e.service)} in ${s(e.area)}, budget ${inr(e.budget)}`,
+  task: (e) => `${s(e.name)} asked for ${s(e.service)} (${s(e.category_label)}) in ${s(e.area)}, budget ${inr(e.budget)}; ringing ${(e.vendors as string[])?.length ?? 0}`,
   vendor_call: (e) => `Calling ${s(e.vendor)} (${s(e.status)})`,
   quote: (e) => !e.price ? `${s(e.vendor)}: ${s(e.notes)}`
     : `${s(e.vendor)} quoted ${inr(e.price)}${e.price_max ? `–${Number(e.price_max).toLocaleString("en-IN")}` : ""}${e.open ? "+" : ""} (${s(e.basis)}), ${e.agreed ? "fits budget" : e.maybe ? "could fit" : "over budget"}`,

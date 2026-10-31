@@ -4,9 +4,9 @@ import os
 os.environ.update(
     DOORMAN_KEY="k", VAANI_API_KEY="", POLL="0", WAVE_TIMEOUT="3600",
     VENDORS=json.dumps([
-        {"name": "A", "phone": "+91 90000 00001", "services": ["ac"]},
-        {"name": "B", "phone": "+91 90000 00002", "services": ["ac"]},
-        {"name": "C", "phone": "+91 90000 00003"},
+        {"name": "A", "phone": "+91 90000 00001", "services": ["ac_repair"]},
+        {"name": "B", "phone": "+91 90000 00002", "services": ["ac_repair"]},
+        {"name": "C", "phone": "+91 90000 00003", "services": ["*"]},
     ]),
 )
 
@@ -153,9 +153,9 @@ def test_tool_path_and_poller_path_do_not_double_up():
 def test_vendors_added_and_removed_from_the_dashboard():
     q = {"key": "k"}
     assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "12345"}).status_code == 422
-    assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "+91 99999 88888", "services": ["Plumber"]}).json()["ok"]
+    assert c.post("/vendors", params=q, json={"name": "Ravi", "phone": "+91 99999 88888", "services": ["plumbing", "made_up"]}).json()["ok"]
     listed = c.get("/vendors", params=q).json()
-    assert {"name": "Ravi", "phone_tail": "8888", "services": ["plumber"]} in listed
+    assert {"name": "Ravi", "phone_tail": "8888", "services": ["plumbing"]} in listed
     assert "99999" not in str(listed)  # numbers never leave the server in full
     assert c.delete("/vendors/ravi", params=q).json()["ok"]
     assert c.delete("/vendors/ravi", params=q).status_code == 404
@@ -208,3 +208,26 @@ def test_vendor_never_hears_the_budget():
     spoken_to_vendor = calls[0]
     assert "8765" not in spoken_to_vendor
     assert "AC not cooling" in spoken_to_vendor and "Koramangala" in spoken_to_vendor and "tomorrow 10 am" in spoken_to_vendor
+
+
+def test_requests_are_categorised_and_only_that_category_is_rung():
+    assert m.categorize("AC not cooling") == "ac_repair"
+    assert m.categorize("tap is leaking in the kitchen") == "plumbing"
+    assert m.categorize("fan not working") == "electrical"
+    assert m.categorize("bike puncture") == "vehicle_repair"
+    assert m.categorize("replace the cupboard door hinge") == "carpentry"  # "replace" must not read as AC
+    assert m.categorize("anything", said="Pest control") == "pest_control"
+    assert m.categorize("teach me guitar") == "other"
+    assert [v["name"] for v in m.vendors_for("ac_repair")] == ["A", "B", "C"]
+    assert [v["name"] for v in m.vendors_for("plumbing")] == ["C"]  # C takes any job, A and B don't
+
+
+def test_no_one_in_the_category_means_no_one_is_rung():
+    m.VENDORS[:] = [{"name": "A", "phone": "+91 90000 00001", "services": ["ac_repair"]}]
+    try:
+        m.TASKS.clear()
+        r = m.start_task({"name": "Priya", "phone": "9876543210", "service": "plumber", "details": "tap leaking", "budget": "500"})
+        t = m.TASKS[r["task_id"]]
+        assert t["category"] == "plumbing" and t["pending"] == []
+    finally:
+        m.VENDORS[:] = json.loads(os.environ["VENDORS"])

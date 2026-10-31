@@ -117,6 +117,7 @@ analysis = {
                 {"name": "customer_name", "prompt": "The caller's name.", "nullable": True},
                 {"name": "callback_number", "prompt": "A 10-digit mobile number the caller asked to be called back on, digits only, if they gave one.", "nullable": True},
                 {"name": "service", "prompt": "The kind of service needed, in a few words, e.g. AC repair, plumber.", "nullable": True},
+                {"name": "category", "prompt": "Which one category the job belongs to.", "values": ["ac_repair", "appliance_repair", "plumbing", "electrical", "carpentry", "painting", "cleaning", "pest_control", "phone_repair", "vehicle_repair", "movers", "other"], "nullable": True},
                 {"name": "details", "prompt": "The issue in the caller's own words.", "nullable": True},
                 {"name": "address", "prompt": "The full address given.", "nullable": True},
                 {"name": "area", "prompt": "The locality only, e.g. Koramangala.", "nullable": True},

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Archivo, Instrument_Serif, Manrope } from "next/font/google";
+import { Archivo, Instrument_Serif, Kalam, Manrope } from "next/font/google";
 import "./globals.css";
 
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
+const kalam = Kalam({ variable: "--font-kalam", subsets: ["latin"], weight: "400" });
 const archivo = Archivo({ variable: "--font-archivo", subsets: ["latin"], axes: ["wdth"] });
 const instrument = Instrument_Serif({
   variable: "--font-instrument",
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${archivo.variable} ${instrument.variable} h-full antialiased`}
+      className={`${manrope.variable} ${archivo.variable} ${instrument.variable} ${kalam.variable} h-full antialiased`}
     >
       <body className="min-h-full font-sans">{children}</body>
     </html>

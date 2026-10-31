@@ -36,6 +36,32 @@ VENDORS = (json.load(open(VENDORS_FILE)) if os.path.exists(VENDORS_FILE)
            else json.loads(os.getenv("VENDORS", "[]")))
 
 
+# Job categories: what a vendor takes and what a request is. Keywords back up Vaani's own extraction.
+CATEGORIES = {
+    "ac_repair": ("AC repair", r"\bac\b|a\.c\.|air ?condition|aircon|cooling|split|gas (?:refill|top)"),
+    "appliance_repair": ("Appliance repair", r"fridge|refrigerator|washing machine|microwave|geyser|\btv\b|television|\bro\b|purifier|chimney|oven"),
+    "plumbing": ("Plumbing", r"plumb|leak|\btap\b|pipe|drain|toilet|flush|block|water tank|sink"),
+    "electrical": ("Electrical", r"electric|wiring|\bwire|switch|socket|\bfan\b|light|\bmcb\b|short circuit|power|inverter"),
+    "carpentry": ("Carpentry", r"carpent|wood|door|furniture|cupboard|wardrobe|\bbed\b|hinge|\block\b"),
+    "painting": ("Painting", r"paint|putty|wall polish"),
+    "cleaning": ("Cleaning", r"clean|sofa|maid|bathroom wash"),
+    "pest_control": ("Pest control", r"pest|cockroach|termite|\brats?\b|bed ?bug|mosquito"),
+    "phone_repair": ("Phone repair", r"phone|mobile|screen|laptop"),
+    "vehicle_repair": ("Vehicle repair", r"\bcar\b|bike|scooter|scooty|tyre|tire|puncture|engine|mechanic|vehicle"),
+    "movers": ("Movers", r"\bmov(?:e|ing|ers)\b|shift|packers"),
+    "other": ("Other", r"$^"),
+}
+
+
+def categorize(*texts, said: str = "") -> str:
+    """Vaani's category if it gave a known one; otherwise the first keyword match; otherwise 'other'."""
+    said = clean(said, 30).lower().replace(" ", "_")
+    if said in CATEGORIES:
+        return said
+    text = " ".join(clean(t) for t in texts).lower()
+    return next((cid for cid, (_, pattern) in CATEGORIES.items() if re.search(pattern, text)), "other")
+
+
 def save_vendors() -> None:
     with open(VENDORS_FILE, "w") as f:
         json.dump(VENDORS, f, indent=1)
@@ -202,11 +228,9 @@ CALLBACK_FIELDS = extract(
 
 # ---- the engine: ring vendors, bargain, decide, call back, book ----
 
-def vendors_for(service: str) -> list[dict]:
-    s = service.lower()
-    match = [v for v in VENDORS if not v.get("services") or "*" in v["services"]
-             or any(k.lower() in s for k in v["services"])]
-    return match or VENDORS
+def vendors_for(category: str) -> list[dict]:
+    """Only the people who take this kind of job. Nobody else gets rung."""
+    return [v for v in VENDORS if "*" in (v.get("services") or ["*"]) or category in v["services"]]
 
 
 def start_task(f: dict) -> dict:
@@ -214,7 +238,8 @@ def start_task(f: dict) -> dict:
     phone = digits(f.get("phone"))
     task = {"name": clean(f.get("name"), 40) or "there", "phone": phone, "address": clean(f.get("address")),
             "area": clean(f.get("area"), 60), "service": clean(f.get("service"), 60),
-            "details": clean(f.get("details")), "when": clean(f.get("when"), 60), "budget": rupees(f.get("budget"))}
+            "details": clean(f.get("details")), "when": clean(f.get("when"), 60), "budget": rupees(f.get("budget")),
+            "category": categorize(f.get("service"), f.get("details"), said=f.get("category") or "")}
     missing = [k for k in ("service", "budget") if not task[k]] + ([] if len(phone) == 10 else ["phone"])
     if missing:
         return {"missing": missing}
@@ -227,9 +252,10 @@ def start_task(f: dict) -> dict:
         return {"missing": ["capacity"]}
     task_id = f"t{len(TASKS) + 1}"
     TASKS[task_id] = {**task, "phone": "+91" + phone, "quotes": {}, "wave": 0, "in_wave": [],
-                      "pending": list(vendors_for(task["service"])), "called_back": False, "booked": None}
+                      "pending": list(vendors_for(task["category"])), "called_back": False, "booked": None}
     publish("task", task_id=task_id, name=task["name"], area=task["area"], service=task["service"],
             details=task["details"], when=task["when"], budget=task["budget"],
+            category=task["category"], category_label=CATEGORIES[task["category"]][0],
             vendors=[v["name"] for v in TASKS[task_id]["pending"]])
     later(2, ring_next, task_id)
     return {"task_id": task_id}
@@ -403,6 +429,9 @@ def call_back(task_id: str) -> None:
         situation = (f"Nobody came within the budget of {t['budget']} rupees. The closest offer:" + offer(best)
                      + f"That is about {cost(best) - t['budget']} rupees over. Explain kindly and ask if "
                      "they want to go ahead with it.")
+    elif not t["quotes"]:
+        situation = (f"Sorted has no {CATEGORIES[t['category']][0].lower()} service person on its list yet. "
+                     "Apologise honestly, say the team is adding more people, and invite them to call again.")
     else:
         situation = ("No service person could take the job right now. Apologise briefly, suggest a higher "
                      "budget or another time, and tell them they can call Sorted again any time.")
@@ -484,7 +513,7 @@ def handle(row: dict) -> bool:
         phone = e.get("callback_number") or placed.get("phone") or row.get("from_number")
         res = start_task({"name": e.get("customer_name"), "phone": phone, "address": e.get("address"),
                           "area": e.get("area"), "service": e.get("service"), "details": e.get("details"),
-                          "when": e.get("when"), "budget": e.get("budget")})
+                          "when": e.get("when"), "budget": e.get("budget"), "category": e.get("category")})
         if "missing" in res:
             publish("intake_incomplete", call_id=call_id, missing=res["missing"], name=clean(e.get("customer_name"), 40))
     elif kind == "vendor_call":
@@ -659,6 +688,12 @@ class VendorIn(BaseModel):
     services: list[str] = ["*"]
 
 
+@app.get("/categories")
+def categories(key: str | None = Query(None)):
+    authorised(key)
+    return [{"id": cid, "label": label} for cid, (label, _) in CATEGORIES.items()]
+
+
 @app.get("/vendors")
 def list_vendors(key: str | None = Query(None)):
     authorised(key)
@@ -674,7 +709,7 @@ def add_vendor(body: VendorIn, key: str | None = Query(None)):
         raise HTTPException(status_code=422, detail="Give the service person a name")
     if len(digits(body.phone)) != 10:
         raise HTTPException(status_code=422, detail="Enter a 10-digit Indian mobile number")
-    services = [clean(x, 30).lower() for x in body.services if clean(x, 30)] or ["*"]
+    services = [x for x in body.services if x == "*" or x in CATEGORIES] or ["*"]
     VENDORS[:] = [v for v in VENDORS if v["name"].lower() != name.lower()]
     VENDORS.append({"name": name, "phone": "+91" + digits(body.phone), "services": services})
     save_vendors()

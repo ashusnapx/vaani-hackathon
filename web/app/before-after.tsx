@@ -1,5 +1,5 @@
-import { EyeOff, FileAudio, HandCoins, Phone, PhoneMissed, PhoneOutgoing, Repeat, User } from "lucide-react";
-import Image from "next/image";
+import { EyeOff, FileAudio, HandCoins, PhoneOutgoing, Repeat } from "lucide-react";
+import { AfterSketch, BeforeSketch } from "./sketch";
 
 // Product facts for one job with three mechanics, not survey statistics.
 const ROWS = [
@@ -17,50 +17,6 @@ const MARKET = [
   ["<1%", "booked online"],
 ] as const;
 
-function Before() {
-  return (
-    <div className="relative h-36" aria-hidden>
-      <span className="absolute top-1/2 left-0 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-surface-2 text-muted">
-        <User className="size-5" strokeWidth={1.75} />
-      </span>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full">
-        {[18, 50, 82].map((y, i) => (
-          <path key={y} d={`M12 50 C 40 ${50 + (i - 1) * 60}, 60 ${y}, 86 ${y}`} className="stroke-muted/50" strokeWidth="1.5"
-            strokeDasharray={i === 1 ? "0" : "3 4"} fill="none" vectorEffect="non-scaling-stroke" />
-        ))}
-      </svg>
-      {[18, 50, 82].map((y, i) => (
-        <span key={y} className={`absolute right-0 grid size-9 -translate-y-1/2 place-items-center rounded-full ${i === 1 ? "bg-surface-2 text-muted" : "bg-scam/10 text-scam"}`} style={{ top: `${y}%` }}>
-          {i === 1 ? <Phone className="size-4" strokeWidth={1.75} /> : <PhoneMissed className="size-4" strokeWidth={1.75} />}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function After() {
-  return (
-    <div className="relative h-36" aria-hidden>
-      <span className="pill-dark absolute top-1/2 left-0 grid size-11 -translate-y-1/2 place-items-center rounded-full">
-        <User className="size-5" strokeWidth={1.75} />
-      </span>
-      <span className="absolute top-1/2 left-[38%] grid size-12 -translate-y-1/2 place-items-center rounded-full border border-line bg-paper">
-        <Image src="/vaani-logo.png" alt="" width={30} height={27} />
-      </span>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full">
-        <path d="M12 50 L38 50" className="stroke-ink" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
-        {[18, 50, 82].map((y) => (
-          <path key={y} d={`M50 50 C 66 50, 70 ${y}, 86 ${y}`} className="march stroke-bronze" strokeWidth="1.5" strokeDasharray="5 5" fill="none" vectorEffect="non-scaling-stroke" />
-        ))}
-      </svg>
-      {[18, 50, 82].map((y) => (
-        <span key={y} className="absolute right-0 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-safe/10 text-safe" style={{ top: `${y}%` }}>
-          <Phone className="size-4" strokeWidth={1.75} />
-        </span>
-      ))}
-    </div>
-  );
-}
 
 export default function BeforeAfter() {
   return (
@@ -70,11 +26,11 @@ export default function BeforeAfter() {
       <div className="mt-10 grid gap-4 md:grid-cols-2">
         <div className="rounded-3xl border border-line bg-surface/50 p-6">
           <p className="label text-xs text-muted">Before · you dial</p>
-          <div className="mt-4"><Before /></div>
+          <div className="mt-2"><BeforeSketch /></div>
         </div>
         <div className="rounded-3xl border border-bronze/40 bg-paper p-6">
           <p className="label text-xs text-bronze">After · Sorted dials</p>
-          <div className="mt-4"><After /></div>
+          <div className="mt-2"><AfterSketch /></div>
         </div>
       </div>
 

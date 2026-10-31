@@ -19,6 +19,7 @@
   --font-sans: var(--font-manrope);
   --font-serif: var(--font-instrument);
   --font-label: var(--font-archivo);
+  --font-hand: var(--font-kalam);
 }
 
 html {
