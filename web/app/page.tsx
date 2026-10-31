@@ -1,57 +1,82 @@
 import { ReactLenis } from "lenis/react";
+import { HandCoins, PhoneIncoming, PhoneOutgoing } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import Board from "./board";
 import CallMe from "./call-me";
+import HeroArt from "./hero-art";
+import Services from "./services";
 
 const number = process.env.NEXT_PUBLIC_SORTED_NUMBER || "+91 80642 79097";
 
 const flow = [
-  ["You call once", "Say the job, your address, when you need it and what you want to pay. In Hindi, English or Hinglish."],
-  ["Sorted rings around", "It phones the local service people, asks each for a price and bargains towards yours."],
-  ["You get a yes", "Sorted calls back with whoever agreed, the best one first and a backup, and their number."],
-];
+  [PhoneIncoming, "You call once", "Say the job, your address, when you need it and what you want to pay. In Hindi, English or Hinglish."],
+  [PhoneOutgoing, "Sorted rings around", "It phones the local service people, asks each for a price and bargains towards yours."],
+  [HandCoins, "You get a yes", "Sorted calls back with whoever agreed, the best one first and a backup, and their number."],
+] as const;
 
 export default function Home() {
   return (
     <ReactLenis root>
       <div className="mx-auto max-w-[88rem] px-4 sm:px-8">
         <header className="flex items-center justify-between gap-4 border-b border-line py-5">
-          <p className="flex items-baseline gap-2">
+          <p className="flex items-center gap-2">
             <span className="font-serif text-3xl italic">Sorted</span>
-            <span className="hidden text-sm text-muted sm:inline">on Vaani</span>
+            <a href="https://www.vaani.dev" target="_blank" rel="noreferrer"
+              className="hidden items-center gap-1.5 rounded-full border border-line py-0.5 pr-2.5 pl-1 text-sm text-muted transition hover:border-ink sm:flex">
+              <Image src="/vaani-logo.png" alt="" width={20} height={18} />
+              on Vaani
+            </a>
           </p>
-          <a href={`tel:${number.replace(/\s/g, "")}`} className="pill-dark rounded-full px-4 py-2 text-sm font-semibold tabular-nums">
-            Call {number}
-          </a>
+          <div className="flex items-center gap-5">
+            <Link href="/dashboard" className="text-sm text-muted hover:text-ink">Dashboard</Link>
+            <a href={`tel:${number.replace(/\s/g, "")}`} className="pill-dark rounded-full px-4 py-2 text-sm font-semibold tabular-nums">
+              Call {number}
+            </a>
+          </div>
         </header>
 
-        <section className="grid gap-10 py-16 lg:grid-cols-[1.25fr_1fr] lg:items-end lg:py-24">
-          <h1 className="font-serif text-[clamp(3rem,7.5vw,6rem)] leading-[0.92] tracking-[-0.02em] text-balance">
-            One call,
-            <br />
-            and it&rsquo;s <em className="text-bronze">sorted.</em>
-          </h1>
-          <div className="max-w-[34rem] space-y-6">
-            <p className="text-lg leading-relaxed text-muted">
+        <section className="grid items-center gap-12 py-14 lg:grid-cols-[1.05fr_1fr] lg:py-20">
+          <div>
+            <h1 className="font-serif text-[clamp(3rem,7vw,5.75rem)] leading-[0.92] tracking-[-0.02em] text-balance">
+              One call,
+              <br />
+              and it&rsquo;s <em className="text-bronze">sorted.</em>
+            </h1>
+            <p className="mt-8 max-w-[34rem] text-lg leading-relaxed text-muted">
               The plumber, the AC mechanic and the electrician down the road have no app and no
               website. They have a phone. Tell Sorted the job and your price once, and it rings them
               for you, bargains, and calls you back with whoever said yes.
             </p>
-            <p className="text-sm text-muted">
-              Your number and address go only to the one person you choose.
-            </p>
-            <CallMe />
+            <p className="mt-3 text-sm text-muted">Your number and address go only to the one person you choose.</p>
+
+            <div className="relative mt-12 max-w-[34rem]">
+              <div className="pointer-events-none absolute -top-11 right-2 flex items-end gap-1 text-bronze" aria-hidden>
+                <span className="font-serif text-xl italic">try it, your phone rings</span>
+                <svg width="44" height="40" viewBox="0 0 44 40" fill="none" className="translate-y-5">
+                  <path d="M40 4 C 30 6, 18 14, 14 32" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M8 26 L14 33 L20 27" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <CallMe />
+            </div>
           </div>
+          <HeroArt />
         </section>
 
         <ol className="grid border-y border-line md:grid-cols-3">
-          {flow.map(([title, body], i) => (
+          {flow.map(([Icon, title, body], i) => (
             <li key={title} className={`py-6 md:px-6 ${i ? "border-t border-line md:border-t-0 md:border-l" : "md:pl-0"}`}>
-              <p className="font-serif text-2xl">{title}</p>
+              <span className="grid size-10 place-items-center rounded-full border border-line bg-surface text-bronze">
+                <Icon className="size-5" strokeWidth={1.75} aria-hidden />
+              </span>
+              <p className="mt-4 font-serif text-2xl">{title}</p>
               <p className="mt-2 max-w-[36ch] leading-relaxed text-muted">{body}</p>
             </li>
           ))}
         </ol>
+
+        <Services />
 
         <Board />
 

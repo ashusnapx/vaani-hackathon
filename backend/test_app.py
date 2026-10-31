@@ -87,3 +87,13 @@ def test_status_found_by_phone_in_any_format():
     r = c.post("/tools/task-status", json={"phone": "+91-98765-43210"}, headers=H).json()
     assert r["status"] == "found"
     assert c.post("/tools/task-status", json={"phone": "11111"}, headers=H).json()["status"] == "none"
+
+
+def test_later_vendors_hear_the_best_quote_so_far():
+    t = task()
+    assert m.best_so_far(m.TASKS[t]) is None
+    quote(t, "A", 900)
+    quote(t, "B", 0)
+    assert m.best_so_far(m.TASKS[t])["price"] == 900
+    quote(t, "C", 750)
+    assert m.best_so_far(m.TASKS[t])["vendor"] == "C"

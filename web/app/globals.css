@@ -68,6 +68,17 @@ html {
 @keyframes on-duty { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 .on-duty { animation: on-duty 2s ease-in-out infinite; }
 
+/* Call waves spreading from Sorted in the hero. */
+@keyframes ripple {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(3.2); opacity: 0; }
+}
+.ripple { opacity: 0; animation: ripple 2.4s ease-out infinite; }
+
+/* Dashes march outward: calls in progress. */
+@keyframes march { to { stroke-dashoffset: -20; } }
+.march { animation: march 1s linear infinite; }
+
 @media (prefers-reduced-motion: reduce) {
-  .on-duty { animation: none; }
+  .on-duty, .ripple, .march { animation: none; }
 }

@@ -21,6 +21,9 @@ SORTED_NUMBER = os.getenv("DOORMAN_NUMBER", "+918064279097")
 # Vaani allows 2 calls at once on this plan, so each leg waits for the last to hang up.
 HANGUP_GRACE = int(os.getenv("HANGUP_GRACE", "12"))
 WAVE_TIMEOUT = int(os.getenv("WAVE_TIMEOUT", "150"))
+# One vendor at a time, so each later call can quote the best price so far back at them.
+WAVE_SIZE = int(os.getenv("WAVE_SIZE", "1"))
+ENOUGH_AGREED = 2  # a best option and a backup
 # [{"name": "Sharma AC Service", "phone": "+9198...", "services": ["ac"]}]; "*" or no list = any job.
 # Real numbers stay in env, never in this public repo.
 VENDORS = json.loads(os.getenv("VENDORS", "[]"))
@@ -125,14 +128,17 @@ def vendors_for(service: str) -> list[dict]:
 def ring_next(task_id: str) -> None:
     with LOCK:
         t = TASKS[task_id]
-        wave = t["pending"][:2]
-        t["pending"] = t["pending"][2:]
+        wave = t["pending"][:WAVE_SIZE]
+        t["pending"] = t["pending"][WAVE_SIZE:]
         t["wave"] += 1
         t["in_wave"] = [v["name"] for v in wave]
         n = t["wave"]
     if not wave:
         call_back(task_id)
         return
+    lead = best_so_far(t)
+    leverage = (f" Another service person has already offered {lead['price']} rupees for this job. "
+                "Mention that once, politely, and ask whether they can match or beat it." if lead else "")
     for v in wave:
         prompt = (
             f"You are Sorted, calling {v['name']} about a job for a customer. Job: {t['service']}. "
@@ -141,7 +147,7 @@ def ring_next(task_id: str) -> None:
             "sentences at a time. Ask whether they do this work and can come at that time, then "
             "their total price including any visit charge. If the price is above the budget, say "
             "the customer's budget and ask if they can do it for that. If they still won't, ask "
-            "once for their best final price; do not push further. As soon as you have a final "
+            f"once for their best final price; do not push further.{leverage} As soon as you have a final "
             f"answer, call `record_quote` with task_id \"{task_id}\", vendor \"{v['name']}\", the "
             "final price as a number, when they can come, agreed true if the final price is within "
             "the budget, and short notes such as where the price started or what is extra. If they "
@@ -158,6 +164,11 @@ def ring_next(task_id: str) -> None:
         else:
             settle(task_id, v["name"], {"price": 0, "agreed": False, "notes": "could not be dialled"})
     later(WAVE_TIMEOUT, close_wave, task_id, n)
+
+
+def best_so_far(t: dict) -> dict | None:
+    priced = [q for q in t["quotes"].values() if q["price"]]
+    return min(priced, key=lambda q: q["price"]) if priced else None
 
 
 def settle(task_id: str, vendor: str, quote: dict) -> None:
@@ -181,12 +192,14 @@ def close_wave(task_id: str, n: int) -> None:
         for name in t["in_wave"]:  # anyone who never answered counts as no answer
             t["quotes"].setdefault(name, {"vendor": name, "price": 0, "agreed": False,
                                           "notes": "no answer", "at": time.time()})
-        agreed = any(q["agreed"] for q in t["quotes"].values())
+        agreed = sum(1 for q in t["quotes"].values() if q["agreed"])
         more = bool(t["pending"])
-    if agreed or not more:
+    if agreed >= ENOUGH_AGREED or not more:
         call_back(task_id)
     else:
-        publish("wave", task_id=task_id, note="Nobody agreed yet, ringing the next two.")
+        lead = best_so_far(t)
+        to_beat = f", with ₹{lead['price']} to beat" if lead else ""
+        publish("wave", task_id=task_id, lead=lead and lead["price"], note=f"Ringing the next one{to_beat}.")
         ring_next(task_id)
 
 
@@ -423,17 +436,54 @@ async def events(key: str | None = Query(None), after: int = 0):
 
 
 @app.get("/calls")
-def calls(key: str | None = Query(None)):
-    """This agent's past calls from Vaani, newest first, trimmed for the dashboard."""
+def calls(key: str | None = Query(None), full: bool = False):
+    """This agent's calls from Vaani, newest first. full=1 returns every field Vaani keeps."""
     authorised(key)
     if not VAANI_API_KEY:
         return []
     r = httpx.get(f"{VAANI}/call-history", headers={"X-API-Key": VAANI_API_KEY},
-                  params={"page": 1, "page_size": 100}, timeout=30)
-    rows = (r.json() or {}).get("data", []) if r.is_success else []
+                  params={"page": 1, "page_size": 200}, timeout=30)
+    rows = [row for row in ((r.json() or {}).get("data", []) if r.is_success else [])
+            if row.get("agent_id") == AGENT_ID]
+    if full:
+        return rows
     keep = ("call_id", "Start_time", "duration_ms", "call_status", "call_type", "from_number",
             "to_number", "call_summary", "call_entity", "call_eval_tag", "post_processing_status")
-    return [{k: row.get(k) for k in keep} for row in rows if row.get("agent_id") == AGENT_ID][:20]
+    return [{k: row.get(k) for k in keep} for row in rows][:20]
+
+
+@app.get("/agent")
+def agent(key: str | None = Query(None)):
+    """The agent's live configuration on Vaani, summarised for the dashboard."""
+    authorised(key)
+    r = httpx.get(f"{VAANI}/agents/{AGENT_ID}", headers={"X-API-Key": VAANI_API_KEY}, timeout=30)
+    if not r.is_success:
+        raise HTTPException(status_code=r.status_code, detail="agent not found")
+    d = r.json()
+    p = d.get("persona") or {}
+    sc = p.get("senses_capabilities") or {}
+    def pick(path):
+        o = sc
+        for k in path:
+            o = (o or {}).get(k)
+        return o
+
+    exp = (d.get("experience") or {}).get("settings") or {}
+    return {
+        "id": d.get("agent_id"), "name": d.get("agent_display_name"), "number": SORTED_NUMBER,
+        "language": sc.get("language"), "auto_detect": sc.get("auto_detect"),
+        "llm": pick(["brain", "llm", "primary"]), "llm_fallback": pick(["brain", "llm", "fallback"]),
+        "stt": pick(["ears", "stt", "primary"]), "stt_fallback": pick(["ears", "stt", "fallback"]),
+        "tts": pick(["mouth", "tts", "primary"]), "tts_fallback": pick(["mouth", "tts", "fallback"]),
+        "greeting": ((p.get("identity") or {}).get("greeting_message") or {}).get("agent_message"),
+        "memory": (p.get("memories") or {}).get("use_previous_call_contexts"),
+        "tools": [f.get("name") for f in ((p.get("actions") or {}).get("functions") or []) if isinstance(f, dict)],
+        "voicemail_detection": (exp.get("call_settings") or {}).get("enable_voicemail_detection"),
+        "max_call_minutes": (exp.get("call_settings") or {}).get("max_call_duration"),
+        "idle": exp.get("idle_conversation_settings"),
+        "last_edited_at": d.get("last_edited_at"), "published_at": d.get("published_at"),
+        "vendors": [v["name"] for v in VENDORS],
+    }
 
 
 @app.get("/recording/{call_id}")

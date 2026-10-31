@@ -145,7 +145,9 @@ function Request({ task, events }: { task: Ev; events: Ev[] }) {
           />
         ))}
       </div>
-      {mine.some((e) => e.type === "wave") && <p className="mt-3 text-sm text-muted">Nobody agreed in the first round, so Sorted rang the next two.</p>}
+      {mine.filter((e) => e.type === "wave").map((w) => (
+        <p key={w.id} className="mt-3 text-sm text-muted">{s(w.note)}</p>
+      ))}
 
       {decision && (
         <div className="mt-6 rounded-2xl border border-line bg-surface/70 p-5">
