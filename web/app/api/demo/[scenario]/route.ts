@@ -1,4 +1,4 @@
-const SCENARIOS = new Set(["scam", "family", "message"]);
+const SCENARIOS = new Set(["agreed", "none"]);
 
 export async function POST(_req: Request, ctx: RouteContext<"/api/demo/[scenario]">) {
   const { scenario } = await ctx.params;

@@ -1,4 +1,4 @@
-"""Create the Doorman agent on Vaani, or push config changes to it.
+"""Create the Sorted agent on Vaani, or push config changes to it.
 
 uv run --with httpx agent/push.py
 """
@@ -12,7 +12,7 @@ import httpx
 
 HERE = pathlib.Path(__file__).parent
 API = "https://api.vaanivoice.ai/api"
-ELDER = "Kamla ji"
+NUMBER = "+918064279097"
 
 
 def env(key: str) -> str:
@@ -26,20 +26,30 @@ H = {"X-API-Key": env("VAANI_API_KEY")}
 
 persona = {
     "identity": {
-        "system_prompt": (HERE / "prompt.md").read_text().replace("{elder_name}", ELDER),
+        "system_prompt": (HERE / "prompt.md").read_text(),
         "greeting_message": {
-            "agent_message": f"Namaste! Aap {ELDER} ke phone par hain, main unka call assistant bol raha hoon. Aap kaun bol rahe hain?",
+            "agent_message": "Namaste, Sorted mein aapka swagat hai! Bataiye, kaunsa kaam karwana hai?",
             "agent_speech_delay": 0,
             "interruptible": True,
         },
     },
     "senses_capabilities": json.loads((HERE / "senses.json").read_text()),
-    # A scam number that calls back is recognised from its last calls.
+    # A returning caller is met by an agent that remembers their last requests.
     "memories": {"use_previous_call_contexts": True, "max_history_calls": 5},
 }
 
-NUMBER = "+918064279097"
-deployment = {"deployment": {"phone": {"call_type": {"Inbound": NUMBER, "Outbound": [NUMBER]}}}}
+# Answers callers ask for most, without a retrieval round trip.
+training = {
+    "know_how": {
+        "faq": {
+            "How does Sorted work?": "Tell us the job, your address, when and your budget. We call several local service people, bargain for you, and call you back with whoever agrees.",
+            "How long does it take?": "Usually a few minutes, at most about thirty. We call you back either way.",
+            "Do I pay Sorted?": "No. You pay the service person directly after the work. Never share an OTP or bank details with anyone on a call.",
+            "Is my number shared?": "Only with the one service person you choose, after you confirm.",
+            "What if nobody agrees to my price?": "We tell you the closest offer and you decide. You can also raise the budget or try another time.",
+        }
+    }
+}
 
 experience = {
     "conversational_experience": {
@@ -62,29 +72,6 @@ experience = {
     },
 }
 
-# The facts a judge is most likely to test, answered without a RAG lookup.
-training = {
-    "know_how": {
-        "faq": {
-            "Is digital arrest real?": "No. Digital arrest does not exist in Indian law. Police, CBI or customs never arrest anyone or ask for money on a phone or video call.",
-            "Does the bank ask for OTP or PIN?": "Never. Banks and RBI never ask for an OTP, PIN, CVV or password on a call.",
-            "Where do I report a fraud call or lost money?": "Call 1930 right away, or file at cybercrime.gov.in. Suspicious calls and SMS can be reported on Chakshu at sancharsaathi.gov.in.",
-            "Do I need my UPI PIN to receive money?": "No. A UPI PIN is only for sending money. Anyone asking for it to send you money is a fraud.",
-            "A caller asked me to install AnyDesk or TeamViewer": "Never install an app because a caller asked. If it is installed, uninstall it, switch off the internet and call the bank on its official number.",
-            "I already paid or shared my OTP": "Call 1930 now, then call the bank on the number on the back of the card to block it. Do not send more money, even for a refund.",
-        }
-    }
-}
-
-TAGS = {
-    "SCAM_BLOCKED": "caller tried to get money, OTP, details or an app, and Doorman refused",
-    "MESSAGE_TAKEN": "a genuine caller left a message",
-    "FAMILY_VERIFIED": "a family member was verified by number or code word",
-    "IMPERSONATION_SUSPECTED": "someone claimed to be family but could not verify",
-    "ELDER_ADVISED": "the elder called for help and was guided",
-    "UNCLEAR": "none of the above",
-}
-
 analysis = {
     "evaluations": {
         "dispositions": {
@@ -93,46 +80,53 @@ analysis = {
                 "name": "outcome",
                 "type": "string",
                 "prompt": "Which one tag best describes how this call ended?",
-                "list_of_tags": TAGS,
+                "list_of_tags": {
+                    "REQUEST_TAKEN": "a customer's job request was taken",
+                    "QUOTE_GIVEN": "a service person gave a price",
+                    "BOOKED": "the customer chose an option and it was booked",
+                    "DECLINED": "the customer or service person said no",
+                    "STATUS_CHECK": "a caller asked about an existing request",
+                    "EMERGENCY_REDIRECTED": "the caller was told to call 112",
+                    "UNCLEAR": "none of the above",
+                },
             }],
         },
         "conversation_evaluation": {
             "enabled": True,
-            "prompt": "Score 1-10: did the assistant protect the elder (shared nothing sensitive, "
-            "refused money/OTP/apps), stay calm and natural, and close the call cleanly? Explain briefly.",
+            "prompt": "Score 1-10: did the assistant collect the request (or price) correctly, bargain "
+            "politely, protect the customer's number and address, and close cleanly? Explain briefly.",
         },
     },
     "extraction": {
         "data_collection": {
             "enabled": True,
             "data_points": [
-                {"name": "caller_type", "prompt": "Who called?", "values": ["scammer", "genuine", "family", "elder", "unclear"], "nullable": True},
-                {"name": "claimed_identity", "prompt": "Who did the caller say they were, with any badge, case or employee number?", "nullable": True},
-                {"name": "organisation", "prompt": "Organisation the caller claimed to represent.", "nullable": True},
-                {"name": "scam_type", "prompt": "Type of scam if any, e.g. digital arrest, KYC, courier, relative emergency, lottery, electricity.", "nullable": True},
-                {"name": "demand", "prompt": "What did the caller want: money, OTP, details, app install, video call, nothing?", "nullable": True},
-                {"name": "amount", "prompt": "Any amount of money mentioned, in rupees.", "nullable": True},
-                {"name": "payment_details", "prompt": "Any UPI ID, account number, link or app the caller gave.", "nullable": True},
-                {"name": "callback_number", "prompt": "Callback number the caller gave.", "nullable": True},
-                {"name": "risk", "prompt": "Risk to the elder.", "values": ["low", "medium", "high"], "nullable": True},
-                {"name": "message_for_family", "prompt": "One sentence the family should read.", "nullable": True},
+                {"name": "caller_role", "prompt": "Was this call with a customer or a service person?", "values": ["customer", "service_person", "unclear"], "nullable": True},
+                {"name": "service", "prompt": "The service or job discussed.", "nullable": True},
+                {"name": "area", "prompt": "Locality of the job.", "nullable": True},
+                {"name": "when", "prompt": "When the job is needed or when the service person can come.", "nullable": True},
+                {"name": "budget", "prompt": "Customer's budget in rupees.", "nullable": True},
+                {"name": "price_quoted", "prompt": "Final price a service person quoted, in rupees.", "nullable": True},
+                {"name": "chosen_vendor", "prompt": "Service person the customer chose, if any.", "nullable": True},
             ],
         }
     },
 }
 
+deployment = {"deployment": {"phone": {"call_type": {"Inbound": NUMBER, "Outbound": [NUMBER]}}}}
+
 id_file = HERE / "agent_id.txt"
 if id_file.exists():
     agent_id = id_file.read_text().strip()
 else:
-    r = httpx.post(f"{API}/create-agent", headers=H, timeout=60,
-                   json={"agent_display_name": "Doorman", "config": {}})
+    r = httpx.post(f"{API}/create-agent", headers=H, timeout=60, json={"agent_display_name": "Sorted", "config": {}})
     r.raise_for_status()
     agent_id = r.json()["agent_id"]
     id_file.write_text(agent_id + "\n")
     print("created", agent_id)
 
-for section, body in [("persona", persona), ("training", training), ("experience", experience), ("analysis", analysis), ("deployment", deployment)]:
+for section, body in [("persona", persona), ("training", training), ("experience", experience),
+                      ("analysis", analysis), ("deployment", deployment)]:
     r = httpx.patch(f"{API}/agent/{agent_id}/{section}", headers=H, json=body, timeout=60)
     print(section, r.status_code, "" if r.is_success else r.text[:400])
     if not r.is_success:

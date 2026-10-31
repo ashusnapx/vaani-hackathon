@@ -1,33 +1,72 @@
 @import "tailwindcss";
 @import "lenis/dist/lenis.css";
 
+/* Vaani's own surface language (paper, ink, bronze, dot grid), applied to a gate register. */
 @theme {
-  --color-ink: #0d0e11;
-  --color-ink-2: #15171c;
-  --color-line: #262a31;
-  --color-ivory: #f3ede1;
-  --color-mute: #9a9488;
-  --color-brass: #d8a657;
-  --color-scam: #ef5a3c;
-  --color-safe: #8fbf8a;
-  --color-family: #8ab4f8;
+  --color-paper: #f7f3ec;
+  --color-surface: #efebe3;
+  --color-surface-2: #ebe4d8;
+  --color-line: #e6dfd4;
+  --color-line-strong: #d6cbb9;
+  --color-ink: #1a1f24;
+  --color-muted: #6d675f;
+  --color-bronze: #8c6b45;
+  --color-bronze-hot: #b57940;
+  --color-scam: #a8321f;
+  --color-safe: #3d6b45;
+  --color-family: #2c4f8a;
+  --color-pending: #8a6a1f;
   --font-sans: var(--font-manrope);
   --font-serif: var(--font-instrument);
+  --font-label: var(--font-archivo);
 }
 
-body {
-  background:
-    radial-gradient(60rem 40rem at 85% -10%, #d8a65714, transparent 60%),
-    radial-gradient(50rem 30rem at -10% 110%, #ef5a3c0d, transparent 60%),
-    var(--color-ink);
-  color: var(--color-ivory);
+html {
+  background-color: var(--color-paper);
+  background-image: radial-gradient(circle, #2b211917 0.7px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--color-ink);
+  scrollbar-color: var(--color-line-strong) var(--color-paper);
+}
+::selection { background: #8c6b4533; color: var(--color-ink); }
+:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; border-radius: 6px; }
+
+.label {
+  font-family: var(--font-label);
+  font-stretch: 75%;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
 }
 
-@keyframes breathe {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.8); }
+/* The dark pill Vaani uses for its primary action. */
+.pill-dark {
+  background: linear-gradient(115deg, #2a3038, #1a1f24 55%, #0f1216);
+  color: #fbfaf7;
+  box-shadow: 0 10px 30px -12px #1a1f2466;
 }
-.on-duty { animation: breathe 2.4s ease-in-out infinite; }
+
+/* Rubber stamp: double rule, condensed caps, ink grain from a noise mask. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35em 0.6em 0.28em;
+  border: 2px solid currentColor;
+  box-shadow: inset 0 0 0 2px var(--color-paper), inset 0 0 0 3px currentColor;
+  font-family: var(--font-label);
+  font-stretch: 75%;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  white-space: nowrap;
+  rotate: -4deg;
+  mix-blend-mode: multiply;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 1 1 1 1 1 1 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='60' filter='url(%23n)'/%3E%3C/svg%3E");
+  mask-size: 160px 60px;
+}
+
+@keyframes on-duty { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.on-duty { animation: on-duty 2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .on-duty { animation: none; }
