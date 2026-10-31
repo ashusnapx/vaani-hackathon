@@ -38,3 +38,10 @@ def test_code_word_never_returned():
     for cw in ("", "rasgulla"):
         r = c.post("/tools/check-caller", json={"claimed_name": "Rahul", "code_word": cw}, headers=H)
         assert "gulab" not in r.text.lower()
+
+
+def test_feed_never_carries_code_word():
+    from app import EVENTS
+    c.post("/tools/check-caller", json={"claimed_name": "Rahul", "code_word": "gulab jamun"}, headers=H)
+    assert EVENTS[-1]["status"] == "family_verified"
+    assert "gulab" not in json.dumps(EVENTS).lower()

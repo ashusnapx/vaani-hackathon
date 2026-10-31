@@ -1,13 +1,16 @@
 """Doorman backend: the tools Vaani calls mid-call, and the post-call webhook."""
 
+import asyncio
 import hmac
 import html
 import json
 import os
 import re
+import time
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Doorman")
@@ -23,6 +26,14 @@ ELDER_NAME = os.getenv("ELDER_NAME", "Kamla ji")
 TRUSTED_CONTACTS = json.loads(os.getenv("TRUSTED_CONTACTS", "[]"))
 REPORTED_NUMBERS = set(json.loads(os.getenv("REPORTED_NUMBERS", "[]")))
 FAMILY_CODE_WORD = os.getenv("FAMILY_CODE_WORD", "")
+
+
+# shortcut: events live in memory and vanish on restart, fine for one demo day
+EVENTS: list[dict] = []
+
+
+def publish(kind: str, **data) -> None:
+    EVENTS.append({"id": len(EVENTS) + 1, "type": kind, "at": time.time(), **data})
 
 
 def authorised(key: str | None) -> None:
@@ -82,6 +93,15 @@ class CheckCaller(BaseModel):
 @app.post("/tools/check-caller")
 def check_caller(body: CheckCaller, x_doorman_key: str | None = Header(None)):
     authorised(x_doorman_key)
+    result = verdict(body)
+    # never the code word itself, only whether one was tried
+    publish("check", claimed_name=body.claimed_name, claimed_relation=body.claimed_relation,
+            phone_number=body.phone_number, code_word_tried=bool(body.code_word),
+            status=result["status"])
+    return result
+
+
+def verdict(body: CheckCaller) -> dict:
     num = digits(body.phone_number)
 
     if num and num in {digits(n) for n in REPORTED_NUMBERS}:
@@ -152,6 +172,7 @@ class Alert(BaseModel):
 @app.post("/tools/alert-family")
 def alert_family(body: Alert, x_doorman_key: str | None = Header(None)):
     authorised(x_doorman_key)
+    publish("alert", **body.model_dump())
     sent = telegram(
         f"⚠️ <b>Scam call to {esc(ELDER_NAME)} — {esc(body.risk).upper()} risk</b>\n"
         f"<b>Type:</b> {esc(body.scam_type)}\n"
@@ -179,6 +200,7 @@ class Message(BaseModel):
 @app.post("/tools/take-message")
 def take_message(body: Message, x_doorman_key: str | None = Header(None)):
     authorised(x_doorman_key)
+    publish("message", **body.model_dump())
     sent = telegram(
         f"📞 <b>Message for {esc(ELDER_NAME)}</b> ({esc(body.urgency)})\n"
         f"<b>From:</b> {esc(body.caller_name)}, {esc(body.organisation)}\n"
@@ -199,10 +221,14 @@ async def vaani_webhook(
     event = await request.json()
     kind = event.get("event") or event.get("event_type") or event.get("type")
     if kind != "call_postprocessing":
-        return {"ok": True, "ignored": kind}
+        publish("call", event=kind, call_id=event.get("room_name") or event.get("call_id"))
+        return {"ok": True}
 
     data = event.get("data") or event
     entities = data.get("entities") or {}
+    publish("report", call_id=data.get("call_id") or data.get("room_name"),
+            summary=data.get("summary"), entities=entities,
+            dispositions=data.get("dispositions"), duration_ms=data.get("call_duration"))
     lines = "\n".join(f"<b>{esc(k)}:</b> {esc(v)}" for k, v in entities.items()) or "—"
     telegram(
         f"🧾 <b>Call report</b> · {esc(data.get('call_id') or data.get('room_name'))}\n"
@@ -210,6 +236,47 @@ async def vaani_webhook(
         f"<b>Outcome:</b> {esc(data.get('dispositions'))}"
     )
     return {"ok": True}
+
+
+@app.get("/events")
+async def events(key: str | None = Query(None), after: int = 0):
+    """SSE feed of everything Doorman does, for the family dashboard."""
+    authorised(key)
+
+    async def stream():
+        sent = max(after, len(EVENTS) - 30)
+        while True:
+            while sent < len(EVENTS):
+                yield f"data: {json.dumps(EVENTS[sent], ensure_ascii=False)}\n\n"
+                sent += 1
+            yield ": ping\n\n"
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache"})
+
+
+@app.post("/demo/{scenario}")
+def demo(scenario: str, key: str | None = Query(None)):
+    """Fake one call's events, so the dashboard can be shown without a phone."""
+    authorised(key)
+    if scenario == "scam":
+        publish("call", event="call_started", call_id="demo-1")
+        publish("check", claimed_name="Inspector Sharma", claimed_relation="CBI", phone_number="",
+                code_word_tried=False, status="unknown")
+        publish("alert", risk="high", scam_type="Digital arrest", caller_claims="CBI officer, badge 4471",
+                demand="UPI transfer to 'safe account'", amount="₹50,000",
+                payment_details="sharma.cbi@okaxis", caller_number="", summary="Threatened arrest over a parcel.")
+        publish("report", call_id="demo-1", summary="Caller posed as CBI and demanded ₹50,000. Doorman refused and alerted family.",
+                entities={"caller_type": "scammer", "scam_type": "digital arrest", "risk": "high"},
+                dispositions={"outcome": "SCAM_BLOCKED"}, duration_ms=74000)
+    elif scenario == "family":
+        publish("check", claimed_name="Rahul", claimed_relation="grandson", phone_number="",
+                code_word_tried=True, status="family_code_wrong")
+    else:
+        publish("message", caller_name="Suresh", organisation="Apollo Pharmacy",
+                purpose="Monthly BP medicines ready", callback_number="080 4567 1234", urgency="normal")
+    return {"ok": True, "events": len(EVENTS)}
 
 
 @app.get("/")

@@ -1,0 +1,34 @@
+@import "tailwindcss";
+@import "lenis/dist/lenis.css";
+
+@theme {
+  --color-ink: #0d0e11;
+  --color-ink-2: #15171c;
+  --color-line: #262a31;
+  --color-ivory: #f3ede1;
+  --color-mute: #9a9488;
+  --color-brass: #d8a657;
+  --color-scam: #ef5a3c;
+  --color-safe: #8fbf8a;
+  --color-family: #8ab4f8;
+  --font-sans: var(--font-manrope);
+  --font-serif: var(--font-instrument);
+}
+
+body {
+  background:
+    radial-gradient(60rem 40rem at 85% -10%, #d8a65714, transparent 60%),
+    radial-gradient(50rem 30rem at -10% 110%, #ef5a3c0d, transparent 60%),
+    var(--color-ink);
+  color: var(--color-ivory);
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+.on-duty { animation: breathe 2.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .on-duty { animation: none; }
+}
