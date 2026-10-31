@@ -3,6 +3,7 @@
 import { ArrowRightIcon as ArrowRight, CalendarXIcon as CalendarX, ChatCircleDotsIcon as ChatCircleDots, CheckCircleIcon as CheckCircle, HandshakeIcon as Handshake, LockIcon as Lock, PhoneCallIcon as PhoneCall, PhoneIncomingIcon as PhoneIncoming, PhoneOutgoingIcon as PhoneOutgoing, ScalesIcon as Scales, StarIcon as Star } from "@phosphor-icons/react";
 import Image from "next/image";
 import Link from "next/link";
+import { toast } from "sonner";
 import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { type Ev, type Row, Detail, dur, inr, s, when } from "../../call-detail";
 
@@ -182,6 +183,25 @@ function lines(text: unknown, n = 3) {
 
 type Lane = { key: string; name: string; role: string };
 
+/** Place one call of a request again, e.g. a callback that was declined or unclear. */
+function CallAgain({ task, step, who }: { task: string; step: string; who: string }) {
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    const t = toast.loading(`Calling ${who} again…`);
+    const r = await fetch(`/api/tasks/${encodeURIComponent(task)}/retry?step=${encodeURIComponent(step)}`, { method: "POST" }).catch(() => null);
+    const body = r ? await r.json().catch(() => ({})) : {};
+    if (r?.ok) toast.success(`Sorted is calling ${who}`, { id: t, description: "The new call appears on this page as soon as Vaani lists it." });
+    else toast.error("Couldn't place the call", { id: t, description: String(body.detail ?? "Backend unreachable.") });
+    setBusy(false);
+  }
+  return (
+    <button onClick={go} disabled={busy} className="pill-dark mt-3 ml-3 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold disabled:opacity-50">
+      <PhoneCall className="size-4" weight="fill" /> {busy ? "Calling…" : `Call ${who} again`}
+    </button>
+  );
+}
+
 /** Who talked to whom, in order: one lifeline per person, one arrow per call. */
 function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: Row[]; task: Ev; current: string; booked: string }) {
   const [open, setOpen] = useState<string | null>(current);
@@ -258,6 +278,9 @@ function Thread({ steps, rows, task, current, booked }: { steps: Step[]; rows: R
                         {open === st.call ? "Hide the full call" : "Full call: recording, transcript, data"}
                       </button>
                     )}
+                    {st.key === "callback" && <CallAgain task={String(task.task_id)} step="callback" who={s(task.name)} />}
+                    {st.key.startsWith("v-") && <CallAgain task={String(task.task_id)} step={`vendor:${st.title}`} who={st.title} />}
+                    {st.key === "locked" && booked && <CallAgain task={String(task.task_id)} step="confirm" who={booked} />}
                     {r && open === st.call && <div className="mt-4 border-t border-line pt-4"><Detail r={r} /></div>}
                   </div>
                 </li>

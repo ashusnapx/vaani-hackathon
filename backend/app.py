@@ -814,6 +814,37 @@ def poll_forever() -> None:
             print("poll failed:", e)
 
 
+@app.post("/tasks/{task_id}/retry")
+def retry(task_id: str, step: str = Query(...), key: str | None = Query(None)):
+    """Place one call of a request again: the callback, a vendor's quote call, or the confirmation."""
+    authorised(key)
+    t = TASKS.get(task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="No request with that id")
+    before = len(EVENTS)
+    if step == "callback":
+        if not t.get("quotes") and not t.get("decision"):
+            raise HTTPException(status_code=409, detail="No quotes yet, so there's nothing to call back about.")
+        t["called_back"] = False
+        call_back(task_id)
+    elif step.startswith("vendor:"):
+        v = vendor_of(step.split(":", 1)[1])
+        if not v:
+            raise HTTPException(status_code=404, detail="That service person isn't on file any more")
+        t.update(pending=[v], called_back=False, booked=t.get("booked"))
+        ring_next(task_id)
+    elif step == "confirm":
+        if not t.get("booked"):
+            raise HTTPException(status_code=409, detail="Nothing is booked yet to confirm.")
+        confirm_vendor(task_id)
+    else:
+        raise HTTPException(status_code=422, detail="Unknown step")
+    placed = next((e for e in EVENTS[before:] if e.get("call_id") or e.get("status") in ("failed", "skipped")), None)
+    if not placed or not placed.get("call_id"):
+        raise HTTPException(status_code=502, detail=(placed or {}).get("error") or "Vaani couldn't place the call just now.")
+    return {"ok": True, "call_id": placed["call_id"], "to": placed.get("to")}
+
+
 @app.post("/calls/{call_id}/process")
 def process_call(call_id: str, key: str | None = Query(None)):
     """Run one finished call through Sorted now, e.g. a customer's call from before a restart."""

@@ -453,3 +453,21 @@ def test_callback_uses_the_language_the_caller_spoke():
     m.handle({"call_id": "in-ta", "call_status": "Completed", "post_processing_status": "completed", "from_number": "+919876543210",
               "call_entity": {"customer_name": "Kavya", "service": "AC repair", "budget": "900", "language_spoken": "ta"}})
     assert next(iter(m.TASKS.values()))["language"] == "ta"
+
+
+def test_retry_places_the_callback_again(monkeypatch):
+    sent = []
+    def fake(kind, name, phone, prompt, greeting, tag, analysis=None, senses=None, lang="en"):
+        m.publish(kind, call_id=f"c{len(sent)}", to=name, status="dialing", **tag)
+        sent.append(kind)
+        return f"c{len(sent)}"
+    monkeypatch.setattr(m, "dispatch", fake)
+    t = task()["task_id"]
+    q = {"key": "k"}
+    assert c.post(f"/tasks/{t}/retry", params={**q, "step": "callback"}).status_code == 409  # nothing to say yet
+    m.quote_in(t, "A", 700)
+    m.TASKS[t]["called_back"] = True
+    r = c.post(f"/tasks/{t}/retry", params={**q, "step": "callback"}).json()
+    assert r["ok"] and sent[-1] == "callback"
+    assert c.post(f"/tasks/{t}/retry", params={**q, "step": "confirm"}).status_code == 409
+    assert c.post("/tasks/nope/retry", params={**q, "step": "callback"}).status_code == 404
