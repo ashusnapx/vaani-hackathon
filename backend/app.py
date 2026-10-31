@@ -100,6 +100,7 @@ EVENTS: list[dict] = []
 TASKS: dict[str, dict] = {}
 PLACED: dict[str, dict] = {}  # call_id we dialled -> {"kind", "task_id", "vendor"}
 SEEN: set[str] = set()
+LAST_CAPTIONS: dict[str, str | None] = {}  # call_id -> signed live captions URL, for the page that asked
 LOCK = threading.Lock()
 
 # Requests, the calls we placed and the calls we've handled survive a restart (gitignored file).
@@ -269,13 +270,17 @@ def dispatch(kind: str, to_name: str, to_phone: str, prompt: str, greeting: str,
             del modify["persona"]["senses_capabilities"]
             publish("note", text=f"Multilingual voice refused for {to_name}; calling in the standard voice.")
             r = httpx.post(f"{VAANI}/trigger-call/", headers={"X-API-Key": VAANI_API_KEY}, json=body, timeout=30)
-        out = (r.json() or {}).get("output") or {}
+        data = r.json() or {}
+        out = data.get("output") or {}
+        # Vaani may put the live captions URL beside "output" rather than in it.
+        captions = out.get("live_captions_url") or data.get("live_captions_url")
         call_id = out.get("call_id") if r.is_success else None
         if call_id:
             PLACED[call_id] = {"kind": kind, **tag}
         publish(kind, status="dialing" if call_id else "failed", to=to_name, call_id=call_id,
-                live_captions_url=out.get("live_captions_url"),
+                live_captions_url=captions,
                 error=None if call_id else r.text[:200], **tag)
+        LAST_CAPTIONS[call_id or ""] = captions
         return call_id
     except httpx.HTTPError as e:
         publish(kind, status="failed", to=to_name, error=str(e), **tag)
@@ -908,7 +913,7 @@ def call_me(body: CallMe, key: str | None = Query(None)):
                        {"phone": phone, "name": name, "language": body.language}, lang=body.language)
     if not call_id:
         raise HTTPException(status_code=502, detail="Vaani couldn't place the call just now. Try again, or ring +91 80642 79097.")
-    return {"ok": True, "call_id": call_id}
+    return {"ok": True, "call_id": call_id, "live_captions_url": LAST_CAPTIONS.get(call_id)}
 
 
 class VendorIn(BaseModel):

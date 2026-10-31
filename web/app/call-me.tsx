@@ -3,6 +3,7 @@
 import { DeviceMobileIcon as DeviceMobile, PhoneCallIcon as PhoneCall, TranslateIcon as Translate, UserIcon as User } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import LiveCaptions from "./live-captions";
 
 // The languages Vaani's Sarvam voice and speech recognition cover, each in its own script.
 // The backend checks the id again, so this list only decides what's offered.
@@ -18,6 +19,7 @@ export default function CallMe() {
   const [lang, setLang] = useState("en"); // English unless they pick another
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [captions, setCaptions] = useState<string | null>(null);
   const ready = name.trim().length > 0 && phone.replace(/\D/g, "").length >= 10;
   const pills = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -31,6 +33,8 @@ export default function CallMe() {
       body: JSON.stringify({ name: name.trim(), phone, language: lang }),
     }).catch(() => null);
     if (r?.ok) {
+      const body = await r.json().catch(() => ({}));
+      setCaptions(typeof body.live_captions_url === "string" ? body.live_captions_url : null);
       toast.success("Sorted is calling you", {
         id,
         duration: 8000,
@@ -109,6 +113,7 @@ export default function CallMe() {
           : state === "error" ? error
           : ready ? "Asks only your address, the issue and your budget." : "Add your name and number to get a call."}
       </p>
+      {captions && <LiveCaptions url={captions} who={name.trim() || "You"} />}
     </form>
   );
 }
