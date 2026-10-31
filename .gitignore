@@ -8,3 +8,4 @@ __pycache__/
 backend/vendors.json
 backend/state.json
 backend/state.json.tmp
+backend/.poller.lock

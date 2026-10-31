@@ -33,7 +33,7 @@ persona = {
     "identity": {
         "system_prompt": (HERE / "prompt.md").read_text(),
         "greeting_message": {
-            "agent_message": "Hi, this is Sorted. Tell me what needs fixing and I'll find someone to do it. What can I get done for you?",
+            "agent_message": "Hi, this is Sorted. What needs fixing today?",
             "agent_speech_delay": 0,
             "interruptible": True,
         },
@@ -73,19 +73,26 @@ training = {
 experience = {
     "conversational_experience": {
         "bg_noise": {"enabled": False},
-        "eagerness_to_speak": "balanced",
-        "filler_words": {"filler_words_frequency": 0, "filler_words_list": []},
+        # Calls showed the agent cutting in and repeating itself: wait longer before speaking, and cover
+        # thinking time with a short filler instead of silence.
+        "eagerness_to_speak": "slow",
+        "filler_words": {"filler_words": True, "filler_words_frequency": 0.3,
+                         "filler_words_list": ["Okay", "Got it", "One moment", "Sure"]},
     },
     "settings": {
         "idle_conversation_settings": {
             "pulse_check": True,
             "end_conversation_on_idle": True,
-            "idle_call_warning_timeout": 12,
-            "idle_call_hangup_timeout": 25,
-            "idle_call_warning_message": "Hello, kya aap line par hain?",
-            "idle_call_hangup_message": "Lagta hai line kat gayi. Main call band kar raha hoon, namaste.",
+            # It said "Hello?" about four seconds after every greeting, while people were still answering.
+            "initial_idle_call_warning_timeout": 10,
+            "initial_idle_call_hungup_timeout": 25,
+            "initial_warning_message": "Can you hear me?",
+            "idle_call_warning_timeout": 15,
+            "idle_call_hangup_timeout": 30,
+            "idle_call_warning_message": "Take your time, I'm still here.",
+            "idle_call_hangup_message": "I'll let you go for now. Call Sorted any time. Goodbye!",
         },
-        "end_call": {"enabled": True, "end_call_phrase": "Dhanyavaad, namaste."},
+        "end_call": {"enabled": True, "end_call_phrase": "Thank you, goodbye!"},
         "call_settings": {"max_call_duration": 10, "max_duration_enabled": True,
                           "enable_voicemail_detection": True, "action": "hang_up"},
     },

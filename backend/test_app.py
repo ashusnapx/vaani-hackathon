@@ -433,3 +433,16 @@ def test_call_cache_version_moves_only_when_a_call_changes(monkeypatch):
     data[0]["call_status"] = "Completed"
     m.refresh_calls()
     assert m.CALLS_CACHE["version"] == v + 1
+
+
+def test_dates_are_said_the_way_people_say_them():
+    import datetime as dt
+    today = dt.date.today()
+    assert m.spoken_when(f"{today}T17:00:00") == "today at 5 pm"
+    assert m.spoken_when(f"{today + dt.timedelta(days=1)}T10:30:00") == "tomorrow at 10:30 am"
+    assert m.spoken_when("evening") == "evening" and m.spoken_when("") == "as soon as possible"
+
+
+def test_every_language_has_its_greetings():
+    assert set(m.CALL_ME_GREETING) == set(m.LANGS) == set(m.CALLBACK_GREETING)
+    assert all("Sorted" in g for g in list(m.CALL_ME_GREETING.values()) + list(m.CALLBACK_GREETING.values()))
