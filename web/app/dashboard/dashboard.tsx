@@ -19,8 +19,12 @@ export function requestCalls(t: Ev, events: Ev[], rows: Row[]) {
     confirm_call: (e) => `Sorted → ${s(e.vendor)}, to confirm`, rating_call: () => `Sorted → ${s(t.name)}, for a rating`,
     change_call: (e) => `Sorted → ${s(e.vendor)}, about a change`,
   };
+  // A website request ("Call me") means Sorted rang them; otherwise they rang Sorted.
+  const intakeRow = intake ? rows.find((r) => r.call_id === intake) : undefined;
+  const fromWebsite = events.some((e) => e.type === "intake_call" && e.call_id === intake)
+    || String(intakeRow?.direction ?? intakeRow?.call_type ?? "").toLowerCase().includes("out");
   const list = [
-    ...(intake ? [{ id: intake, who: `${s(t.name)} ↔ Sorted, the request` }] : []),
+    ...(intake ? [{ id: intake, who: fromWebsite ? `Sorted → ${s(t.name)}, who asked from the website` : `${s(t.name)} → Sorted, with the request` }] : []),
     ...mine.filter((e) => role[e.type]).map((e) => ({ id: String(e.call_id), who: role[e.type](e) })),
   ];
   return list.map((c) => ({ ...c, row: rows.find((r) => r.call_id === c.id) }));

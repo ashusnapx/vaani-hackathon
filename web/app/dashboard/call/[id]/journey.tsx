@@ -40,9 +40,13 @@ function journey(id: string, events: Ev[], row?: Row, rows: Row[] = [], request?
   const last = (type: string, vendor?: unknown) =>
     [...mine].reverse().find((e) => e.type === type && (vendor === undefined || e.vendor === vendor));
 
+  const intakeRow = rows.find((r) => r.call_id === intake);
+  const fromWebsite = events.some((e) => e.type === "intake_call" && e.call_id === intake)
+    || String(intakeRow?.direction ?? intakeRow?.call_type ?? "").toLowerCase().includes("out");
   const steps: Step[] = [{
-    key: "intake", Icon: PhoneIncoming, title: `${s(task.name)} called`,
-    caption: `${s(task.service)} · budget ${inr(task.budget)}`,
+    key: "intake", Icon: fromWebsite ? PhoneOutgoing : PhoneIncoming,
+    title: fromWebsite ? `Sorted called ${s(task.name)}` : `${s(task.name)} called`,
+    caption: `${fromWebsite ? "asked from the website · " : ""}${s(task.service)} · budget ${inr(task.budget)}`,
     call: intake, state: "done",
   }];
   const dialled = mine.filter((e) => e.type === "vendor_call").map((e) => String(e.vendor));
