@@ -171,8 +171,30 @@ GUARD = (
 )
 
 
+# Vendor calls listen and speak in whatever Indian language the vendor answers in.
+# Sarvam's models cover the major Indian languages and code-mixing; auto-detect lets Vaani follow a switch.
+MULTILINGUAL = {
+    "language": "hi",
+    "auto_detect": True,
+    "ears": {"stt": {
+        "primary": {"provider": "sarvam", "model": "saaras:v3", "config": {}},
+        "fallback": {"provider": "deepgram", "model": "nova-3", "language": "multi"},
+    }},
+    "mouth": {"tts": {
+        "primary": {"provider": "sarvam", "model": "bulbul:v3", "voice_id": "aayan", "voice_name": "aayan",
+                    "is_cloned": False, "config": {"language": "hi"}},
+    }},
+}
+LANGUAGES = (
+    " Language: open in simple English. The moment they answer in another language or a mix (Hindi, Kannada, "
+    "Tamil, Telugu, Marathi, Bengali, Gujarati, Malayalam, Odia, Punjabi), switch to it and keep using it, with "
+    "simple everyday words. Many service people are more comfortable in their own language; never make them "
+    "switch to English. Say prices as clear numbers."
+)
+
+
 def dispatch(kind: str, to_name: str, to_phone: str, prompt: str, greeting: str,
-             tag: dict, analysis: dict | None = None) -> str | None:
+             tag: dict, analysis: dict | None = None, senses: dict | None = None) -> str | None:
     """Start an outbound call on the same Vaani agent, wearing a different persona for this call."""
     if not (to_phone and VAANI_API_KEY and AGENT_ID):
         publish(kind, status="skipped", to=to_name, reason="phone or Vaani key not set", **tag)
@@ -183,6 +205,9 @@ def dispatch(kind: str, to_name: str, to_phone: str, prompt: str, greeting: str,
     }}}
     if analysis:
         modify["analysis"] = analysis
+    if senses:
+        modify["persona"]["senses_capabilities"] = senses
+        modify["persona"]["identity"]["system_prompt"] += LANGUAGES
     body = {
         "agent_id": AGENT_ID, "medium": "telephony", "name": clean(to_name, 60),
         "contact_number": to_phone, "outbound_number": SORTED_NUMBER,
@@ -192,6 +217,11 @@ def dispatch(kind: str, to_name: str, to_phone: str, prompt: str, greeting: str,
     }
     try:
         r = httpx.post(f"{VAANI}/trigger-call/", headers={"X-API-Key": VAANI_API_KEY}, json=body, timeout=30)
+        if senses and r.status_code in (400, 422):
+            # Multilingual config refused: ring them anyway with the agent's standard voice.
+            del modify["persona"]["senses_capabilities"]
+            publish("note", text=f"Multilingual voice refused for {to_name}; calling in the standard voice.")
+            r = httpx.post(f"{VAANI}/trigger-call/", headers={"X-API-Key": VAANI_API_KEY}, json=body, timeout=30)
         out = (r.json() or {}).get("output") or {}
         call_id = out.get("call_id") if r.is_success else None
         if call_id:
@@ -318,7 +348,7 @@ def ring_next(task_id: str) -> None:
                     f"The customer would like it done {clean(when, 40)}, and the location is "
                     f"{clean(t['area'], 60) or 'nearby'}. Would you be able to take this up?")
         call_id = dispatch("vendor_call", v["name"], v["phone"], prompt, greeting,
-                           {"task_id": task_id, "vendor": v["name"]}, VENDOR_FIELDS)
+                           {"task_id": task_id, "vendor": v["name"]}, VENDOR_FIELDS, MULTILINGUAL)
         if not call_id:
             quote_in(task_id, v["name"], 0, notes="could not be dialled")
     later(WAVE_TIMEOUT, close_wave, task_id, n)
@@ -476,7 +506,7 @@ def confirm_vendor(task_id: str) -> None:
     )
     greeting = f"Hello, Sorted again. The customer has confirmed the {clean(t['service'], 40)} job with you. Could you note the address?"
     dispatch("confirm_call", t["booked"], phone_of(t["booked"]), prompt, greeting,
-             {"task_id": task_id, "vendor": t["booked"]})
+             {"task_id": task_id, "vendor": t["booked"]}, senses=MULTILINGUAL)
 
 
 def match_vendor(t: dict, said) -> str | None:

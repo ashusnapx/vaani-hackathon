@@ -197,7 +197,7 @@ def test_a_firm_fit_beats_a_cheaper_maybe():
 
 def test_vendor_never_hears_the_budget():
     calls, real = [], m.dispatch
-    m.dispatch = lambda kind, name, phone, prompt, greeting, tag, analysis=None: calls.append(prompt + greeting) or None
+    m.dispatch = lambda kind, name, phone, prompt, greeting, tag, analysis=None, senses=None: calls.append(prompt + greeting) or None
     try:
         m.TASKS.clear()
         m.start_task({"name": "Priya", "phone": "9876543210", "service": "AC repair", "details": "AC not cooling",
@@ -231,3 +231,24 @@ def test_no_one_in_the_category_means_no_one_is_rung():
         assert t["category"] == "plumbing" and t["pending"] == []
     finally:
         m.VENDORS[:] = json.loads(os.environ["VENDORS"])
+
+
+def test_vendor_calls_go_multilingual_and_fall_back_if_refused(monkeypatch):
+    sent = []
+
+    class R:
+        def __init__(self, code):
+            self.status_code, self.is_success, self.text = code, code < 300, ""
+
+        def json(self):
+            return {"output": {"call_id": "c1"}} if self.is_success else {}
+
+    def post(url, headers=None, json=None, timeout=None):
+        sent.append(json["modify_agent"]["persona"].get("senses_capabilities"))
+        return R(422 if len(sent) == 1 else 200)
+
+    monkeypatch.setattr(m, "VAANI_API_KEY", "x")
+    monkeypatch.setattr(m, "AGENT_ID", "agent")
+    monkeypatch.setattr(m.httpx, "post", post)
+    assert m.dispatch("vendor_call", "A", "+919000000001", "p", "g", {}, senses=m.MULTILINGUAL) == "c1"
+    assert sent[0]["ears"]["stt"]["primary"]["model"] == "saaras:v3" and sent[1] is None
