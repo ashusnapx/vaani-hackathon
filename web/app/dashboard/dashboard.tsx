@@ -4,6 +4,7 @@ import { ArrowClockwiseIcon as ArrowClockwise } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import Trace from "./trace";
 import { type Agent, type Ev, type Row, direction, dur, inr, label, s, statusTone, when } from "./call-detail";
 
 /** One row per request: who, what, where it stands, and the best price so far. Opens its journey. */
@@ -118,10 +119,10 @@ export default function Dashboard() {
     load();
     fetch("/api/agent").then((r) => (r.ok ? r.json() : null)).then(setAgent).catch(() => {});
     const t = setInterval(load, 15000);
-    const es = new EventSource("/api/events");
+    const es = new EventSource("/api/events?full=1");
     es.onmessage = (m) => {
       const e: Ev = JSON.parse(m.data);
-      setEvents((prev) => (prev.some((p) => p.id === e.id) ? prev : [e, ...prev].slice(0, 80)));
+      setEvents((prev) => (prev.some((p) => p.id === e.id) ? prev : [e, ...prev]));
       if (e.type === "report" || e.type === "call") load();
     };
     return () => {
@@ -163,6 +164,10 @@ export default function Dashboard() {
       </dl>
 
       <Requests events={events} />
+
+      <h2 className="mt-12 font-serif text-3xl">Live trace</h2>
+      <p className="mt-1 text-sm text-muted">Sorted&rsquo;s line, and a branch for every request: each call, quote and decision in the order it happened.</p>
+      <Trace events={events} rows={rows} text={(e) => (EVENT_TEXT[e.type] ?? ((x: Ev) => label(x.type)))(e)} />
 
       <h2 className="mt-12 font-serif text-3xl">Calls</h2>
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -213,16 +218,6 @@ export default function Dashboard() {
             <Link href="/service-people" className="underline underline-offset-2 hover:text-bronze">Manage service people →</Link>
           </p>
 
-          <h2 className="mt-8 font-serif text-3xl">Live activity</h2>
-          <ol className="mt-3 max-h-96 space-y-1.5 overflow-y-auto text-sm" data-lenis-prevent>
-            {events.length === 0 && <li className="text-muted">Quiet so far.</li>}
-            {events.slice(0, 12).map((e) => (
-              <li key={e.id} className="flex gap-3">
-                <span className="w-16 shrink-0 text-muted tabular-nums">{new Date(e.at * 1000).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
-                <span>{(EVENT_TEXT[e.type] ?? ((x: Ev) => label(x.type)))(e)}</span>
-              </li>
-            ))}
-          </ol>
 
           {agent && (
             <>

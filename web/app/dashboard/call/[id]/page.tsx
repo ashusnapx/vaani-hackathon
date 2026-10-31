@@ -2,12 +2,18 @@ import { GaugeIcon as Gauge, UsersThreeIcon as UsersThree } from "@phosphor-icon
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import Journey from "./journey";
 
 export const metadata: Metadata = { title: "Sorted — call" };
 
-export default async function CallPage({ params }: PageProps<"/dashboard/call/[id]">) {
+// The call id is request-time data, so it is read inside a Suspense boundary (Cache Components).
+async function Body({ params }: { params: PageProps<"/dashboard/call/[id]">["params"] }) {
   const { id } = await params;
+  return <Journey id={decodeURIComponent(id)} />;
+}
+
+export default function CallPage({ params }: PageProps<"/dashboard/call/[id]">) {
   return (
     <div className="mx-auto max-w-[96rem] px-4 sm:px-8">
       <header className="flex items-center justify-between gap-4 border-b border-line py-5">
@@ -23,7 +29,9 @@ export default async function CallPage({ params }: PageProps<"/dashboard/call/[i
           <Link href="/service-people" className="flex items-center gap-1.5 text-muted hover:text-ink"><UsersThree className="size-4" /> Service people</Link>
         </nav>
       </header>
-      <Journey id={decodeURIComponent(id)} />
+      <Suspense fallback={<p className="pt-10 text-muted">Loading the request…</p>}>
+        <Body params={params} />
+      </Suspense>
     </div>
   );
 }
