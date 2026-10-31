@@ -1,14 +1,14 @@
 {
- "language": "hi",
+ "language": "en",
  "accent": null,
  "tts_accent": null,
- "auto_detect": true,
+ "auto_detect": false,
  "ears": {
   "stt": {
    "primary": {
     "provider": "deepgram",
     "model": "nova-3",
-    "language": "hi",
+    "language": "en",
     "keywords": [
      "upi",
      "gpay",
@@ -127,7 +127,18 @@
      "lottery",
      "KBC",
      "anydesk",
-     "teamviewer"
+     "teamviewer",
+     "Sorted",
+     "AC repair",
+     "plumber",
+     "electrician",
+     "carpenter",
+     "pest control",
+     "Koramangala",
+     "HSR Layout",
+     "Indiranagar",
+     "Whitefield",
+     "rupees"
     ],
     "config": {}
    },
@@ -176,7 +187,7 @@
     "is_cloned": false,
     "config": {
      "speed": 1,
-     "language": "hi",
+     "language": "en",
      "emotion": [],
      "emotions": []
     }
@@ -187,7 +198,7 @@
     "voice_id": "aayan",
     "is_cloned": false,
     "config": {
-     "language": "hi"
+     "language": "en-IN"
     },
     "voice_name": "aayan"
    },
